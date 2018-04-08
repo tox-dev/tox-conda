@@ -1,4 +1,5 @@
-# tox-conda plugin
+tox-conda plugin
+----------------
 
 .. some references
 
