@@ -1,0 +1,10 @@
+site_name: tox-conda
+site_description: Make tox cooperate with conda
+site_author: Oliver Bestwalter
+
+theme: readthedocs
+
+repo_url: https://github.com/obestwalter/tox-conda
+
+pages:
+- Home: index.md
