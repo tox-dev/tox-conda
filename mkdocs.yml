@@ -4,7 +4,7 @@ site_author: Oliver Bestwalter
 
 theme: readthedocs
 
-repo_url: https://github.com/obestwalter/tox-conda
+repo_url: https://github.com/tox-dev/tox-conda
 
 pages:
 - Home: index.md

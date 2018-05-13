@@ -10,12 +10,12 @@ tox-conda
     :target: https://pypi.org/project/tox-conda
     :alt: Python versions
 
-.. image:: https://travis-ci.org/obestwalter/tox-conda.svg?branch=master
-    :target: https://travis-ci.org/obestwalter/tox-conda
+.. image:: https://travis-ci.org/tox-dev/tox-conda.svg?branch=master
+    :target: https://travis-ci.org/tox-dev/tox-conda
     :alt: See Build Status on Travis CI
 
-.. image:: https://ci.appveyor.com/api/projects/status/github/obestwalter/tox-conda?branch=master
-    :target: https://ci.appveyor.com/project/obestwalter/tox-conda/branch/master
+.. image:: https://ci.appveyor.com/api/projects/status/github/tox-dev/tox-conda?branch=master
+    :target: https://ci.appveyor.com/project/tox-dev/tox-conda/branch/master
     :alt: See Build Status on AppVeyor
 
 Make tox cooperate with conda
@@ -67,13 +67,13 @@ Issues
 If you encounter any problems, please `file an issue`_ along with a detailed description.
 
 .. _`Cookiecutter`: https://github.com/audreyr/cookiecutter
-.. _`@obestwalter`: https://github.com/obestwalter
+.. _`@obestwalter`: https://github.com/tox-dev
 .. _`MIT`: http://opensource.org/licenses/MIT
 .. _`BSD-3`: http://opensource.org/licenses/BSD-3-Clause
 .. _`GNU GPL v3.0`: http://www.gnu.org/licenses/gpl-3.0.txt
 .. _`Apache Software License 2.0`: http://www.apache.org/licenses/LICENSE-2.0
 .. _`cookiecutter-tox-plugin`: https://github.com/tox-dev/cookiecutter-tox-plugin
-.. _`file an issue`: https://github.com/obestwalter/tox-conda/issues
+.. _`file an issue`: https://github.com/tox-dev/tox-conda/issues
 .. _`pytest`: https://github.com/pytest-dev/pytest
 .. _`tox`: https://tox.readthedocs.io/en/latest/
 .. _`pip`: https://pypi.org/project/pip/
