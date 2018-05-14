@@ -23,7 +23,7 @@ setup(
     url='https://github.com/tox-dev/tox-conda',
     packages=find_packages(),
     python_requires='>=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*',
-    install_requires=['tox>=3.0.0'],
+    # install_requires=['tox>=3.0.0'],
     entry_points={'tox': ['conda = tox_conda.plugin']},
     license='MIT',
     classifiers=[

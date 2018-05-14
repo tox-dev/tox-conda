@@ -13,12 +13,14 @@ matrix:
         env: TOX_ENV=py35
       - python: 3.6
         env: TOX_ENV=py36
-      - python: pypy
-        env: TOX_ENV=pypy
       - python: 3.6
         env: TOX_ENV=flake8
 
 install:
+  - pip install pycosat pyopenssl requests ruamel.yaml
+  - git clone -b master --single-branch --depth 1000 https://github.com/conda/conda.git
+  - pushd conda && pip install . && conda init && popd
+  - conda info
   - pip install tox
 
 script:

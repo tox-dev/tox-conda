@@ -24,6 +24,10 @@ install:
   - "%PYTHON%/Scripts/easy_install -U pip"
   - "%PYTHON%/Scripts/pip install tox"
   - "%PYTHON%/Scripts/pip install wheel"
+  - "%PYTHON%/Scripts/pip install pycosat pyopenssl requests ruamel.yaml"
+  - "git clone -b master --single-branch --depth 1000 https://github.com/conda/conda.git"
+  - "cd conda && pip install . && conda init && cd .."
+  - "conda info"
 
 build: false  # Not a C# project, build stuff at the test step instead.
 

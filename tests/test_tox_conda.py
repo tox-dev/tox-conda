@@ -1,8 +1,13 @@
-
-
-def test_dummy():
-    """
-    TODO think about how to test this properly
-    TODO check tox own tests to see how to do this (use of _pytestplugin)
-    TODO (also check if someone did this already)
-    """
+def test_skip_unknown_interpreter_result_json(cmd, initproj):
+    initproj("conda-01", filedefs={
+        'tox.ini': '''
+            [tox]
+            envlist=py27,
+            [testenv]
+            deps =
+              itsdangerous
+        '''
+    })
+    result = cmd()
+    assert not result.ret
+    assert "congratulations" in result.out
