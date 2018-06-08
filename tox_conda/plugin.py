@@ -1,7 +1,7 @@
-import json
 import logging
 import os
 import sys
+from warnings import warn
 
 import pluggy
 
@@ -13,88 +13,124 @@ on_win = bool(sys.platform == "win32")
 
 
 @hookimpl
+def tox_get_python_executable(envconfig):
+
+    if on_win:
+        return os.path.join(envconfig.envdir, "python.exe")
+    else:
+        return os.path.join(envconfig.envdir, "python")
+
+    return True
+
+
+@hookimpl
+def tox_configure(config):
+    envs = config.envlist[:]
+    for env in envs:
+        envconfig = config.envconfigs[env]
+
+        basepython = envconfig.basepython
+        if not basepython.startswith("python"):
+            msg = "Skipping {0}. The conda plugin only supports python basepython.".format(
+                env
+            )
+            warn(RuntimeWarning(msg))
+            config.envconfigs.pop(env)
+            config.envlist.remove(env)
+            continue
+
+        python_version = basepython[6:]
+
+        conda_deps = ["python={0}".format(python_version)]
+        pip_deps = []
+        for dep in envconfig.deps:
+            dep_str = str(dep)
+            if dep_str.startswith(("-r", "-e", "-c", ":")):
+                pip_deps.append(dep)
+            elif dep_str.startswith("--pip"):
+                dep.name = dep_str[5:].strip()
+                pip_deps.append(dep)
+            else:
+                conda_deps.append(dep)
+
+        envconfig.deps = pip_deps
+        envconfig.conda_deps = conda_deps
+
+        if envconfig.conda_deps and not hasattr(envconfig, "channels"):
+            envconfig.channels = ["defaults"]
+
+        create_env_yml(envconfig)
+
+
+@hookimpl
 def tox_testenv_create(venv, action):
-    deps = venv.envconfig.deps
-    conda_deps, pip_deps = split_conda_deps(deps)
-    venv.envconfig.deps = pip_deps
-    venv.envconfig.conda_deps = conda_deps
+    """Perform creation action for this venv."""
 
-    # if venv.envconfig.recreate:
-
-    basepython = venv.envconfig.basepython
-    if not basepython.startswith("python"):
-        raise RuntimeError("The conda plugin only supports python basepython.")
-    python_version = basepython[6:]
     env_location = str(venv.path)
-    args = [
-        '%s' % os.environ["CONDA_EXE"],
-        "install",
-        "--mkdir",
-        "-y",
-        "-p",
-        env_location,
-        "python=%s" % python_version,
-    ]
-    args.extend(str(dep) for dep in conda_deps)
+    yaml = venv.envconfig.envyaml
 
-    env = venv._getenv(testcommand=False)
+    args = ["conda", "env", "update", "-p", env_location, "--file", yaml]
+    # Extend conda environment creation with conda dependencies right away.
     redirect = venv.session.config.option.verbose_level < 2
-
-    result = action.popen(args, env=env, redirect=redirect)
+    result = action.popen(args, redirect=redirect)
 
     return True if result is None else result
 
 
-@hookimpl
-def tox_runtest_pre(venv):
-    env_var_map = get_activated_env_vars(venv)
-    os.environ.clear()
-    os.environ.update(env_var_map)
+def is_exe(fpath):
+    """Check whether a filepath points to an executable."""
+    return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
 
 
-def get_activated_env_vars(venv):
-    env_location = str(venv.path)
-    cmd_builder = []
-    if on_win:
-        conda_bat = os.environ["CONDA_BAT"]
-        cmd_builder += [
-            "CALL \"{0}\" activate \"{1}\"".format(conda_bat, env_location),
-            "&&",
-            "%CONDA_PYTHON_EXE% -c \"import os, json; print(json.dumps(dict(os.environ)))\"",
-        ]
+def which(cmd):
+    """Try to find command on path and return full path if found."""
+    fpath, fname = os.path.split(cmd)
+    if fpath:
+        if is_exe(cmd):
+            return cmd
     else:
-        conda_exe = os.environ["CONDA_EXE"]
-        cmd_builder += [
-            "sh -c \'"
-            "eval \"$(\"{0}\" shell.posix hook)\"".format(conda_exe),
-            "&&",
-            "conda activate {0}".format(env_location),
-            "&&",
-            "\"$CONDA_PYTHON_EXE\" -c \"import os, json; print(json.dumps(dict(os.environ)))\"",
-            "\'",
-        ]
+        for path in os.environ["PATH"].split(os.pathsep):
+            exe_file = os.path.join(path, cmd)
+            if is_exe(exe_file):
+                return exe_file
 
-    cmd = " ".join(cmd_builder)
-    env = venv._getenv(testcommand=False)
-    action = venv.session.newaction(venv, "activate")
-    with action:
-        result = action.popen([cmd], env=env, redirect=False, returnout=True, shell=True)
-    env_var_map = json.loads(result)
-    return env_var_map
+    return None
 
 
-def split_conda_deps(deps):
-    conda_deps = []
-    pip_deps = []
-    for dep in deps:
-        dep_str = str(dep)
-        if dep_str.startswith(("-r", "-e", "-c", ":")):
-            pip_deps.append(dep)
-        elif dep_str.startswith("--pip"):
-            dep.name = dep_str[5:].strip()
-            pip_deps.append(dep)
-        else:
-            conda_deps.append(dep)
-    return conda_deps, pip_deps
+def create_env_yml(envconfig):
+    """Create a conda environment.yaml file from an envconfig.
+    
+    envconfig should contain the following properties:
+        - envname
+        - channels
+        - conda_deps
+        - deps (pip)
 
+    It will store the filepath of the environment.yaml in envconfig.envyaml.
+    """
 
+    lines = ["name: " + envconfig.envname]
+
+    lines.append("channels:")
+    for channel in envconfig.channels:
+        lines.append("  - {0}".format(channel))
+
+    lines.append("dependencies:")
+    if envconfig.conda_deps:
+        for dep in envconfig.conda_deps:
+            lines.append("  - {0}".format(dep))
+
+    if envconfig.deps:
+        lines.append("  - pip:")
+        for dep in envconfig.deps:
+            lines.append("    - {0}".format(dep))
+
+    # Add line breaks to all lines.
+    lines = [line + "\n" for line in lines]
+
+    os.makedirs(envconfig.envdir, exist_ok=True)
+    file_path = os.path.join(envconfig.envdir, envconfig.envname + ".yml")
+    envconfig.envyaml = file_path
+
+    with open(file_path, "w") as f:
+        f.writelines(lines)
