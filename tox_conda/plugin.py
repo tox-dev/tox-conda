@@ -1,7 +1,8 @@
+import json
 import logging
 import os
-import sys
 import shutil
+import sys
 from warnings import warn
 
 import pluggy
@@ -30,8 +31,6 @@ def tox_get_python_executable(envconfig):
         return os.path.join(envconfig.envdir, "python.exe")
     else:
         return os.path.join(envconfig.envdir, "python")
-
-    return True
 
 
 @hookimpl
@@ -62,23 +61,8 @@ def tox_configure(config):
             continue
         envconfig.conda = True
 
-        # Split Conda dependencies from pip dependencies.
-        python_version = basepython[6:]
-        conda_deps = ["python={0}".format(python_version)]
-        pip_deps = []
-        for dep in envconfig.deps:
-            dep_str = str(dep)
-            if dep_str.startswith(("-r", "-e", "-c", ":")):
-                pip_deps.append(dep)
-            elif dep_str.startswith("--pip"):
-                dep.name = dep_str[5:].strip()
-                pip_deps.append(dep)
-            else:
-                conda_deps.append(dep)
-
-        envconfig.deps = pip_deps
-        envconfig.conda_deps = conda_deps
-
+        # Split Conda dependencies from pip dependencies and create environment.yaml.
+        split_deps(envconfig)
         create_env_yml(envconfig)
 
 
@@ -101,7 +85,8 @@ def tox_testenv_create(venv, action):
 
     # Create new environment.
     args = ["conda", "env", "update", "-p", env_location, "--file", yaml]
-    result.append(action.popen(args, redirect=redirect))
+    env = venv._getenv(testcommand=False)
+    result.append(action.popen(args, env=env, redirect=redirect))
 
     return True if not result else result
 
@@ -136,6 +121,29 @@ def which(cmd):
                 return exe_file
 
     return None
+
+
+def split_deps(envconfig):
+    """Split conda and pip dependencies.
+
+    Pip dependencies are left in envconfig.deps.
+    Conda dependencies are put in envconfig.conda_deps.
+    """
+    python_version = envconfig.basepython[6:]
+    conda_deps = ["python={0}".format(python_version)]
+    pip_deps = []
+    for dep in envconfig.deps:
+        dep_str = str(dep)
+        if dep_str.startswith(("-r", "-e", "-c", ":")):
+            pip_deps.append(dep)
+        elif dep_str.startswith("--pip"):
+            dep.name = dep_str[5:].strip()
+            pip_deps.append(dep)
+        else:
+            conda_deps.append(dep)
+
+    envconfig.deps = pip_deps
+    envconfig.conda_deps = conda_deps
 
 
 def create_env_yml(envconfig):
