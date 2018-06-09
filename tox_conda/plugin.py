@@ -13,6 +13,16 @@ on_win = bool(sys.platform == "win32")
 
 
 @hookimpl
+def tox_addoption(parser):
+    parser.add_testenv_attribute(
+        name="conda_channels",
+        type="line-list",
+        default=("defaults"),
+        help="Conda channels for environment creation.",
+    )
+
+
+@hookimpl
 def tox_get_python_executable(envconfig):
     """Return a python executable for the given python base name."""
     if on_win:
@@ -26,22 +36,25 @@ def tox_get_python_executable(envconfig):
 @hookimpl
 def tox_configure(config):
     """Called after command line options are parsed and ini-file has been read."""
+
     envs = config.envlist[:]
     for env in envs:
+        # Get envconfig for this env
         envconfig = config.envconfigs[env]
 
+        # Only set conda to True for supported Python versions, others are created normally.
         basepython = envconfig.basepython
         if not basepython.startswith("python"):
-            msg = "Skipping {0}. The conda plugin only supports python basepython.".format(
+            msg = "{0} will not be created using conda, only Python basepython is supported.".format(
                 env
             )
             warn(RuntimeWarning(msg))
-            config.envconfigs.pop(env)
-            config.envlist.remove(env)
+            envconfig.conda = False
             continue
+        envconfig.conda = True
 
+        # Split Conda dependencies from pip dependencies.
         python_version = basepython[6:]
-
         conda_deps = ["python={0}".format(python_version)]
         pip_deps = []
         for dep in envconfig.deps:
@@ -57,9 +70,6 @@ def tox_configure(config):
         envconfig.deps = pip_deps
         envconfig.conda_deps = conda_deps
 
-        if envconfig.conda_deps and not hasattr(envconfig, "channels"):
-            envconfig.channels = ["defaults"]
-
         create_env_yml(envconfig)
 
 
@@ -67,15 +77,27 @@ def tox_configure(config):
 def tox_testenv_create(venv, action):
     """Perform creation action for this venv."""
 
+    if not venv.envconfig.conda:
+        return None
+
     env_location = str(venv.path)
     yaml = venv.envconfig.envyaml
 
-    args = ["conda", "env", "update", "-p", env_location, "--file", yaml]
-    # Extend conda environment creation with conda dependencies right away.
+    # Force creation, as tox manages whether it's necessary.
+    args = ["conda", "env", "create", "-p", env_location, "--file", yaml, "--force"]
+
     redirect = venv.session.config.option.verbose_level < 2
     result = action.popen(args, redirect=redirect)
 
     return True if result is None else result
+
+
+@hookimpl
+def tox_testenv_install_deps(venv, action):
+    """Perform install dependencies action for this venv."""
+    # If created using conda, all pip dependencies are already installed at creation.
+    if venv.config.conda:
+        return True
 
 
 def is_exe(fpath):
@@ -103,7 +125,7 @@ def create_env_yml(envconfig):
 
     envconfig should contain the following properties:
         - envname
-        - channels
+        - conda_channels
         - conda_deps
         - deps (pip)
 
@@ -112,9 +134,10 @@ def create_env_yml(envconfig):
 
     lines = ["name: " + envconfig.envname]
 
-    lines.append("channels:")
-    for channel in envconfig.channels:
-        lines.append("  - {0}".format(channel))
+    if envconfig.conda_channels:
+        lines.append("channels:")
+        for channel in envconfig.conda_channels:
+            lines.append("  - {0}".format(channel))
 
     lines.append("dependencies:")
     if envconfig.conda_deps:
@@ -129,6 +152,7 @@ def create_env_yml(envconfig):
     # Add line breaks to all lines.
     lines = [line + "\n" for line in lines]
 
+    # Write environment.yaml and store location in envconfig.
     os.makedirs(envconfig.envdir, exist_ok=True)
     file_path = os.path.join(envconfig.envdir, envconfig.envname + ".yml")
     envconfig.envyaml = file_path
