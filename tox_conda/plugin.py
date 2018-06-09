@@ -6,7 +6,7 @@ from warnings import warn
 import pluggy
 
 hookimpl = pluggy.HookimplMarker("tox")
-log = logging.getLogger('conda')
+log = logging.getLogger("conda")
 
 
 on_win = bool(sys.platform == "win32")
@@ -14,7 +14,7 @@ on_win = bool(sys.platform == "win32")
 
 @hookimpl
 def tox_get_python_executable(envconfig):
-
+    """Return a python executable for the given python base name."""
     if on_win:
         return os.path.join(envconfig.envdir, "python.exe")
     else:
@@ -25,6 +25,7 @@ def tox_get_python_executable(envconfig):
 
 @hookimpl
 def tox_configure(config):
+    """Called after command line options are parsed and ini-file has been read."""
     envs = config.envlist[:]
     for env in envs:
         envconfig = config.envconfigs[env]
@@ -99,7 +100,7 @@ def which(cmd):
 
 def create_env_yml(envconfig):
     """Create a conda environment.yaml file from an envconfig.
-    
+
     envconfig should contain the following properties:
         - envname
         - channels
