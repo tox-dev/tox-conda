@@ -1,6 +1,7 @@
 import logging
 import os
 import sys
+import shutil
 from warnings import warn
 
 import pluggy
@@ -37,6 +38,10 @@ def tox_get_python_executable(envconfig):
 def tox_configure(config):
     """Called after command line options are parsed and ini-file has been read."""
 
+    # Directory to store conda files.
+    config.conda_workdir = os.path.join(config.toxworkdir, "conda")
+
+    # Set testenv configurations.
     envs = config.envlist[:]
     for env in envs:
         # Get envconfig for this env
@@ -45,7 +50,7 @@ def tox_configure(config):
         # Only set conda to True for supported Python versions, others are created normally.
         basepython = envconfig.basepython
         if not basepython.startswith("python"):
-            msg = "{0} will not be created using conda, only Python basepython is supported.".format(
+            msg = "{0} will not be created using conda, only Python basepython is supported by tox-conda.".format(
                 env
             )
             warn(RuntimeWarning(msg))
@@ -81,22 +86,27 @@ def tox_testenv_create(venv, action):
         return None
 
     env_location = str(venv.path)
-    yaml = venv.envconfig.envyaml
-
-    # Force creation, as tox manages whether it's necessary.
-    args = ["conda", "env", "create", "-p", env_location, "--file", yaml, "--force"]
-
+    yaml = venv.envconfig.conda_envyaml
     redirect = venv.session.config.option.verbose_level < 2
-    result = action.popen(args, redirect=redirect)
+    result = []
 
-    return True if result is None else result
+    # Remove old environment if recreating.
+    if venv.envconfig.recreate:
+        if os.path.exists(env_location):
+            shutil.rmtree(env_location)
+
+    # Create new environment.
+    args = ["conda", "env", "update", "-p", env_location, "--file", yaml]
+    result.append(action.popen(args, redirect=redirect))
+
+    return True if not result else result
 
 
 @hookimpl
 def tox_testenv_install_deps(venv, action):
     """Perform install dependencies action for this venv."""
     # If created using conda, all pip dependencies are already installed at creation.
-    if venv.config.conda:
+    if venv.envconfig.conda:
         return True
 
 
@@ -153,9 +163,9 @@ def create_env_yml(envconfig):
     lines = [line + "\n" for line in lines]
 
     # Write environment.yaml and store location in envconfig.
-    os.makedirs(envconfig.envdir, exist_ok=True)
-    file_path = os.path.join(envconfig.envdir, envconfig.envname + ".yml")
-    envconfig.envyaml = file_path
+    file_path = os.path.join(envconfig.config.conda_workdir, envconfig.envname + ".yml")
+    envconfig.conda_envyaml = file_path
+    os.makedirs(envconfig.config.conda_workdir, exist_ok=True)
 
     with open(file_path, "w") as f:
         f.writelines(lines)
