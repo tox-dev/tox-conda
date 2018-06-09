@@ -41,6 +41,10 @@ def tox_configure(config):
     # Directory to store conda files.
     config.conda_workdir = os.path.join(config.toxworkdir, "conda")
 
+    # Override getting python executable.
+    envconfig_class = type(config.envconfigs[config.envlist[0]])
+    envconfig_class.get_envpython = get_conda_python
+
     # Set testenv configurations.
     envs = config.envlist[:]
     for env in envs:
@@ -108,6 +112,10 @@ def tox_testenv_install_deps(venv, action):
     # If created using conda, all pip dependencies are already installed at creation.
     if venv.envconfig.conda:
         return True
+
+
+def get_conda_python(envconfig):
+    return os.path.join(envconfig.envdir, "python")
 
 
 def is_exe(fpath):
