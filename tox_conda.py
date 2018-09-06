@@ -24,6 +24,8 @@ def tox_testenv_create(venv, action):
     if not conda_exe:
         raise RuntimeError("Can't locate conda executable")
 
+    venv.envconfig.conda_exe = conda_exe
+
     envdir = venv.envconfig.envdir
     python = get_py_version(venv.envconfig.basepython)
 
