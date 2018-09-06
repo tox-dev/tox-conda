@@ -1,5 +1,7 @@
 import os
 import pluggy
+
+import tox.venv
 from tox.venv import VirtualEnv
 
 hookimpl = pluggy.HookimplMarker('tox')
@@ -34,5 +36,9 @@ def tox_testenv_create(venv, action):
 @hookimpl
 def tox_testenv_install_deps(venv, action):
 
-    deps = venv.get_resolved_dependencies()
-    print(deps)
+    # Install dependencies from conda here
+
+    # Install dependencies from pypi here
+    tox.venv.tox_testenv_install_deps(venv=venv, action=action)
+
+    return True
