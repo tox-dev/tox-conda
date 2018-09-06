@@ -71,3 +71,9 @@ target/
 # pyenv
 .python-version
 
+# Other
+.*.swp
+*~
+
+# Mac OSX
+.DS_Store
