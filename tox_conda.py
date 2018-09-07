@@ -38,7 +38,14 @@ def tox_testenv_create(venv, action):
 @hookimpl
 def tox_testenv_install_deps(venv, action):
 
+    basepath = venv.path.dirpath()
+    envdir = venv.envconfig.envdir
+    conda_exe = venv.envconfig.conda_exe
+    conda_deps = ['whatever']
+
     # Install dependencies from conda here
+    args = [conda_exe, 'install', '-p', envdir] + conda_deps
+    venv._pcall(args, venv=False, action=action, cwd=basepath)
 
     # Install dependencies from pypi here
     tox.venv.tox_testenv_install_deps(venv=venv, action=action)
