@@ -13,6 +13,20 @@ def get_py_version(pystring):
 
 
 @hookimpl
+def tox_configure(config):
+    from IPython import embed
+    embed()
+
+    conda_str = config._cfg.get('testenv', 'conda')
+    if not conda_str:
+        return True
+
+    deps = conda_str.split('\n')
+
+    return True
+
+
+@hookimpl
 def tox_testenv_create(venv, action):
 
     venv.session.make_emptydir(venv.path)
