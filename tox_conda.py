@@ -25,7 +25,13 @@ def parse_condition(dependency):
 @hookimpl
 def tox_configure(config):
 
+    # Make sure that each testenv has these attributes no matter what
+    for _, envconfig in config.envconfigs.items():
+        envconfig.conda_deps = []
+        envconfig.conda_channels = []
+
     conda_str = config._cfg.get('testenv', 'conda')
+    config.has_conda_deps = bool(conda_str)
     if not conda_str:
         return True
 
@@ -34,23 +40,23 @@ def tox_configure(config):
     channels = channel_str.split('\n') if channel_str else None
 
     for name, envconfig in config.envconfigs.items():
-        envconfig.conda_deps = set()
-        envconfig.conda_channels = set()
+        conda_deps = set()
+        conda_channels = set()
 
         for dep in deps:
             conditions, requirement = parse_condition(dep)
             for cond in conditions:
                 if cond == '' or cond in name:
-                    envconfig.conda_deps.add(requirement)
+                    conda_deps.add(requirement)
 
         for chan in channels:
             conditions, channel = parse_condition(chan)
             for cond in conditions:
                 if cond == '' or cond in name:
-                    envconfig.conda_channels.add(channel)
+                    conda_channels.add(channel)
 
-        envconfig.conda_deps = list(envconfig.conda_deps)
-        envconfig.conda_channels = list(envconfig.conda_channels)
+        envconfig.conda_deps = list(conda_deps)
+        envconfig.conda_channels = list(conda_channels)
 
     return True
 
@@ -75,14 +81,24 @@ def tox_testenv_create(venv, action):
     args = [conda_exe, 'create', '--yes', '-p', envdir, python]
     venv._pcall(args, venv=False, action=action, cwd=basepath)
 
+    venv.envconfig.conda_python = python
+
+    return True
+
+
+def install_conda_deps(venv, action, basepath, envdir):
+
+    conda_exe = venv.envconfig.conda_exe
+    conda_deps = venv.envconfig.conda_deps
+    python = venv.envconfig.conda_python
+
     # We include the python version in the conda requirements in order to make
     # sure that none of the other conda requirements inadvertently downgrade
     # python in this environment. If any of the requirements are in conflict
     # with the installed python version, installation will fail (which is what
     # we want).
-    venv.envconfig.conda_deps.append(python)
-
-    return True
+    args = [conda_exe, 'install', '--yes', '-p', envdir, python] + conda_deps
+    venv._pcall(args, venv=False, action=action, cwd=basepath)
 
 
 @hookimpl
@@ -90,12 +106,9 @@ def tox_testenv_install_deps(venv, action):
 
     basepath = venv.path.dirpath()
     envdir = venv.envconfig.envdir
-    conda_exe = venv.envconfig.conda_exe
-    conda_deps = venv.envconfig.conda_deps
 
-    # Install dependencies from conda here
-    args = [conda_exe, 'install', '--yes', '-p', envdir] + conda_deps
-    venv._pcall(args, venv=False, action=action, cwd=basepath)
+    if venv.envconfig.config.has_conda_deps and len(venv.envconfig.conda_deps) > 0:
+        install_conda_deps(venv, action, basepath, envdir)
 
     # Install dependencies from pypi here
     tox.venv.tox_testenv_install_deps(venv=venv, action=action)
