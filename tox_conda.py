@@ -12,16 +12,43 @@ def get_py_version(pystring):
     return "python={}".format(version)
 
 
+def parse_condition(dependency):
+    components = [x.strip() for x in dependency.split(':')]
+    if len(components) > 1:
+        condition, requirement = components[0], components[1]
+    else:
+        condition, requirement = '', components[0]
+
+    return condition, requirement
+
+
 @hookimpl
 def tox_configure(config):
-    from IPython import embed
-    embed()
 
     conda_str = config._cfg.get('testenv', 'conda')
     if not conda_str:
         return True
 
     deps = conda_str.split('\n')
+    channel_str = config._cfg.get('testenv', 'channels')
+    channels = channel_str.split('\n') if channel_str else None
+
+    for name, envconfig in config.envconfigs.items():
+        envconfig.conda_deps = set()
+        envconfig.conda_channels = set()
+
+        for dep in deps:
+            condition, requirement = parse_condition(dep)
+            if condition == '' or condition in name:
+                envconfig.conda_deps.add(requirement)
+
+        for chan in channels:
+            condition, channel = parse_condition(chan)
+            if condition == '' or condition in name:
+                envconfig.conda_channels.add(channel)
+
+        envconfig.conda_deps = list(envconfig.conda_deps)
+        envconfig.conda_channels = list(envconfig.conda_channels)
 
     return True
 
@@ -55,10 +82,10 @@ def tox_testenv_install_deps(venv, action):
     basepath = venv.path.dirpath()
     envdir = venv.envconfig.envdir
     conda_exe = venv.envconfig.conda_exe
-    conda_deps = ['whatever']
+    conda_deps = venv.envconfig.conda_deps
 
     # Install dependencies from conda here
-    args = [conda_exe, 'install', '-p', envdir] + conda_deps
+    args = [conda_exe, 'install', '--yes', '-p', envdir] + conda_deps
     venv._pcall(args, venv=False, action=action, cwd=basepath)
 
     # Install dependencies from pypi here
