@@ -73,6 +73,13 @@ def tox_testenv_create(venv, action):
     args = [conda_exe, 'create', '--yes', '-p', envdir, python]
     venv._pcall(args, venv=False, action=action, cwd=basepath)
 
+    # We include the python version in the conda requirements in order to make
+    # sure that none of the other conda requirements inadvertently downgrade
+    # python in this environment. If any of the requirements are in conflict
+    # with the installed python version, installation will fail (which is what
+    # we want).
+    venv.envconfig.conda_deps.append(python)
+
     return True
 
 
