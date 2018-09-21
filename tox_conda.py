@@ -15,11 +15,11 @@ def get_py_version(pystring):
 def parse_condition(dependency):
     components = [x.strip() for x in dependency.split(':')]
     if len(components) > 1:
-        condition, requirement = components[0], components[1]
+        conditions, requirement = components[0], components[1]
     else:
-        condition, requirement = '', components[0]
+        conditions, requirement = '', components[0]
 
-    return condition, requirement
+    return conditions.split(','), requirement
 
 
 @hookimpl
@@ -38,14 +38,16 @@ def tox_configure(config):
         envconfig.conda_channels = set()
 
         for dep in deps:
-            condition, requirement = parse_condition(dep)
-            if condition == '' or condition in name:
-                envconfig.conda_deps.add(requirement)
+            conditions, requirement = parse_condition(dep)
+            for cond in conditions:
+                if cond == '' or cond in name:
+                    envconfig.conda_deps.add(requirement)
 
         for chan in channels:
-            condition, channel = parse_condition(chan)
-            if condition == '' or condition in name:
-                envconfig.conda_channels.add(channel)
+            conditions, channel = parse_condition(chan)
+            for cond in conditions:
+                if cond == '' or cond in name:
+                    envconfig.conda_channels.add(channel)
 
         envconfig.conda_deps = list(envconfig.conda_deps)
         envconfig.conda_channels = list(envconfig.conda_channels)
