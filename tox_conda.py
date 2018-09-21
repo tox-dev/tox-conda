@@ -78,7 +78,10 @@ def tox_testenv_create(venv, action):
     envdir = venv.envconfig.envdir
     python = get_py_version(venv.envconfig.basepython)
 
-    args = [conda_exe, 'create', '--yes', '-p', envdir, python]
+    args = [conda_exe, 'create', '--yes', '-p', envdir]
+    for channel in venv.envconfig.conda_channels:
+        args += ['--channel', channel]
+    args += [python]
     venv._pcall(args, venv=False, action=action, cwd=basepath)
 
     venv.envconfig.conda_python = python
@@ -90,14 +93,16 @@ def install_conda_deps(venv, action, basepath, envdir):
 
     conda_exe = venv.envconfig.conda_exe
     conda_deps = venv.envconfig.conda_deps
-    python = venv.envconfig.conda_python
 
+    args = [conda_exe, 'install', '--yes', '-p', envdir]
+    for channel in venv.envconfig.conda_channels:
+        args += ['--channel', channel]
     # We include the python version in the conda requirements in order to make
     # sure that none of the other conda requirements inadvertently downgrade
     # python in this environment. If any of the requirements are in conflict
     # with the installed python version, installation will fail (which is what
     # we want).
-    args = [conda_exe, 'install', '--yes', '-p', envdir, python] + conda_deps
+    args += [venv.envconfig.conda_python] + conda_deps
     venv._pcall(args, venv=False, action=action, cwd=basepath)
 
 
