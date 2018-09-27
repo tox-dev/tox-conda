@@ -1,4 +1,6 @@
 import os
+import subprocess as sp
+
 import pluggy
 
 import tox.venv
@@ -28,6 +30,25 @@ def tox_addoption(parser):
     )
 
 
+def find_conda():
+
+    # This should work if we're not already in an environment
+    conda_exe = os.environ.get('_CONDA_EXE')
+    if conda_exe:
+        return conda_exe
+
+    # This should work if we're in an active environment
+    conda_exe = os.environ.get('CONDA_EXE')
+    if conda_exe:
+        return conda_exe
+
+    # Try a simple fallback
+    if sp.call(['conda', '-h'], stdout=sp.PIPE, stderr=sp.PIPE) == 0:
+        return 'conda'
+
+    raise RuntimeError("Can't locate conda executable")
+
+
 @hookimpl
 def tox_testenv_create(venv, action):
 
@@ -36,10 +57,7 @@ def tox_testenv_create(venv, action):
 
     # Check for venv.envconfig.sitepackages and venv.config.alwayscopy here
 
-    conda_exe = os.environ.get('CONDA_EXE')
-    if not conda_exe:
-        raise RuntimeError("Can't locate conda executable")
-
+    conda_exe = find_conda()
     venv.envconfig.conda_exe = conda_exe
 
     envdir = venv.envconfig.envdir
