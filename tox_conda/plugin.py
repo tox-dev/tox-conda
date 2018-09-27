@@ -79,6 +79,8 @@ def install_conda_deps(venv, action, basepath, envdir):
     conda_exe = venv.envconfig.conda_exe
     conda_deps = venv.envconfig.conda_deps
 
+    action.setactivity('installcondadeps', ', '.join(conda_deps))
+
     args = [conda_exe, 'install', '--yes', '-p', envdir]
     for channel in venv.envconfig.conda_channels:
         args += ['--channel', channel]
