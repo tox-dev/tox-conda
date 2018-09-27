@@ -12,53 +12,20 @@ def get_py_version(pystring):
     return "python={}".format(version)
 
 
-def parse_condition(dependency):
-    components = [x.strip() for x in dependency.split(':')]
-    if len(components) > 1:
-        conditions, requirement = components[0], components[1]
-    else:
-        conditions, requirement = '', components[0]
-
-    return conditions.split(','), requirement
-
-
 @hookimpl
-def tox_configure(config):
+def tox_addoption(parser):
 
-    # Make sure that each testenv has these attributes no matter what
-    for _, envconfig in config.envconfigs.items():
-        envconfig.conda_deps = []
-        envconfig.conda_channels = []
+    parser.add_testenv_attribute(
+        name="conda_deps",
+        type="line-list",
+        help="each line specifies a conda dependency in conda format"
+    )
 
-    conda_str = config._cfg.get('testenv', 'conda')
-    config.has_conda_deps = bool(conda_str)
-    if not conda_str:
-        return True
-
-    deps = conda_str.split('\n')
-    channel_str = config._cfg.get('testenv', 'channels')
-    channels = channel_str.split('\n') if channel_str else None
-
-    for name, envconfig in config.envconfigs.items():
-        conda_deps = set()
-        conda_channels = set()
-
-        for dep in deps:
-            conditions, requirement = parse_condition(dep)
-            for cond in conditions:
-                if cond == '' or cond in name:
-                    conda_deps.add(requirement)
-
-        for chan in channels:
-            conditions, channel = parse_condition(chan)
-            for cond in conditions:
-                if cond == '' or cond in name:
-                    conda_channels.add(channel)
-
-        envconfig.conda_deps = list(conda_deps)
-        envconfig.conda_channels = list(conda_channels)
-
-    return True
+    parser.add_testenv_attribute(
+        name="conda_channels",
+        type="line-list",
+        help="each line specifies a conda channel"
+    )
 
 
 @hookimpl
@@ -112,7 +79,7 @@ def tox_testenv_install_deps(venv, action):
     basepath = venv.path.dirpath()
     envdir = venv.envconfig.envdir
 
-    if venv.envconfig.config.has_conda_deps and len(venv.envconfig.conda_deps) > 0:
+    if len(venv.envconfig.conda_deps) > 0:
         install_conda_deps(venv, action, basepath, envdir)
 
     # Install dependencies from pypi here
