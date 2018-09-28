@@ -10,6 +10,12 @@ hookimpl = pluggy.HookimplMarker('tox')
 
 
 def get_py_version(pystring):
+
+    # Handle the case where no basepython is explicitly given, so it is
+    # actually a python executable in the host environment
+    if os.path.isfile(pystring):
+        pystring = os.path.basename(pystring)
+
     version = pystring[len('python'):]
     return "python={}".format(version)
 
