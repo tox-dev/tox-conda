@@ -1,4 +1,5 @@
 import os
+import re
 import subprocess as sp
 
 import pluggy
@@ -9,15 +10,28 @@ from tox.venv import VirtualEnv
 hookimpl = pluggy.HookimplMarker('tox')
 
 
-def get_py_version(pystring):
+def get_py_version(envconfig):
 
-    # Handle the case where no basepython is explicitly given, so it is
-    # actually a python executable in the host environment
-    if os.path.isfile(pystring):
-        pystring = os.path.basename(pystring)
+    # Try to use basepython
+    match = re.match(r'python(\d)(?:\.(\d))?', envconfig.basepython)
+    if match:
+        groups = match.groups()
+        version = groups[0]
+        if groups[1]:
+            version += ".{}".format(groups[1])
 
-    version = pystring[len('python'):]
-    return "python={}".format(version)
+    # First fallback
+    elif envconfig.python_info.version_info:
+        version = '{}.{}'.format(*envconfig.python_info.version_info[:2])
+
+    # Second fallback
+    else:
+        code = 'import sys; print("{}.{}".format(*sys.version_info[:2]))'
+        args = [envconfig.basepython, '-c', code]
+        result = sp.check_output(args)
+        version = result.decode('utf-8').strip()
+
+    return 'python={}'.format(version)
 
 
 @hookimpl
@@ -67,7 +81,7 @@ def tox_testenv_create(venv, action):
     venv.envconfig.conda_exe = conda_exe
 
     envdir = venv.envconfig.envdir
-    python = get_py_version(venv.envconfig.basepython)
+    python = get_py_version(venv.envconfig)
 
     args = [conda_exe, 'create', '--yes', '-p', envdir]
     for channel in venv.envconfig.conda_channels:
