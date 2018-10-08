@@ -1,11 +1,13 @@
 import os
 import re
+import types
 import subprocess as sp
 
 import pluggy
+import py.path
 
 import tox.venv
-from tox.venv import VirtualEnv
+
 
 hookimpl = pluggy.HookimplMarker('tox')
 
@@ -69,6 +71,16 @@ def find_conda():
     raise RuntimeError("Can't locate conda executable")
 
 
+def venv_lookup(self, name):
+
+    # In Conda environments on Windows, the Python executable is installed in
+    # the top-level environment directory, as opposed to virtualenvs, where it
+    # is installed in the Scripts directory. Tox assumes that looking in the
+    # Scripts directory is sufficient, which is why this workaround is required.
+    paths = [self.envconfig.envdir, self.envconfig.envbindir]
+    return py.path.local.sysfind(name, paths=paths)
+
+
 @hookimpl
 def tox_testenv_create(venv, action):
 
@@ -82,6 +94,10 @@ def tox_testenv_create(venv, action):
 
     envdir = venv.envconfig.envdir
     python = get_py_version(venv.envconfig)
+
+    # This is a workaround for locating the Python executable in Conda
+    # environments on Windows.
+    venv._venv_lookup = types.MethodType(venv_lookup, venv)
 
     args = [conda_exe, 'create', '--yes', '-p', envdir]
     for channel in venv.envconfig.conda_channels:
