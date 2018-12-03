@@ -7,6 +7,7 @@ import pluggy
 import py.path
 
 import tox.venv
+from tox.config import DepConfig
 
 
 hookimpl = pluggy.HookimplMarker('tox')
@@ -50,6 +51,17 @@ def tox_addoption(parser):
         type="line-list",
         help="each line specifies a conda channel"
     )
+
+
+@hookimpl
+def tox_configure(config):
+
+    # This is a pretty cheesy workaround. It allows tox to consider changes to
+    # the conda dependencies when it decides whether an existing environment
+    # needs to be updated before being used
+    for _, envconfig in config.envconfigs.items():
+        conda_deps = [DepConfig(name) for name in envconfig.conda_deps]
+        envconfig.deps.extend(conda_deps)
 
 
 def find_conda():
@@ -135,8 +147,14 @@ def tox_testenv_install_deps(venv, action):
     basepath = venv.path.dirpath()
     envdir = venv.envconfig.envdir
 
-    if len(venv.envconfig.conda_deps) > 0:
+    num_conda_deps = len(venv.envconfig.conda_deps)
+    if num_conda_deps > 0:
         install_conda_deps(venv, action, basepath, envdir)
+
+    # Account for the fact that we added the conda_deps to the deps list in
+    # tox_configure (see comment there for rationale). We don't want them to be
+    # present when we call pip install
+    venv.envconfig.deps = venv.envconfig.deps[:-1*num_conda_deps]
 
     # Install dependencies from pypi here
     tox.venv.tox_testenv_install_deps(venv=venv, action=action)
