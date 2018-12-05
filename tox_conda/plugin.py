@@ -150,11 +150,10 @@ def tox_testenv_install_deps(venv, action):
     num_conda_deps = len(venv.envconfig.conda_deps)
     if num_conda_deps > 0:
         install_conda_deps(venv, action, basepath, envdir)
-
-    # Account for the fact that we added the conda_deps to the deps list in
-    # tox_configure (see comment there for rationale). We don't want them to be
-    # present when we call pip install
-    venv.envconfig.deps = venv.envconfig.deps[:-1*num_conda_deps]
+        # Account for the fact that we added the conda_deps to the deps list in
+        # tox_configure (see comment there for rationale). We don't want them
+        # to be present when we call pip install
+        venv.envconfig.deps = venv.envconfig.deps[:-1*num_conda_deps]
 
     # Install dependencies from pypi here
     tox.venv.tox_testenv_install_deps(venv=venv, action=action)
