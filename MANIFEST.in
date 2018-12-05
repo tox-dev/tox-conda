@@ -1,5 +1,13 @@
 include LICENSE
 include README.rst
+include CHANGES.rst
 
-recursive-exclude * __pycache__
-recursive-exclude * *.py[co]
+include setup.cfg
+
+recursive-include docs *
+
+prune build
+prune docs/_build
+prune docs/api
+
+global-exclude *.pyc *.o
