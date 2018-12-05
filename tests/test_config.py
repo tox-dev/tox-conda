@@ -1,3 +1,6 @@
+import pytest
+
+
 def test_conda_deps(tmpdir, newconfig):
     config = newconfig(
         [],
@@ -75,3 +78,29 @@ def test_conda_channels(tmpdir, newconfig):
     assert hasattr(config.envconfigs['py1'], 'conda_channels')
     assert len(config.envconfigs['py1'].conda_channels) == 1
     assert 'conda-forge' in config.envconfigs['py1'].conda_channels
+
+
+@pytest.mark.xfail(reason='Option --force-deps not yet implemented for conda-deps')
+def test_conda_force_deps(tmpdir, newconfig):
+    config = newconfig(
+        ['--force-dep=something<42.1'],
+        """
+        [tox]
+        toxworkdir = {}
+        [testenv:py1]
+        deps=
+            hello
+        conda_deps=
+            something
+            else
+        conda_channels=
+            conda-forge
+    """.format(
+            tmpdir
+        ),
+    )
+
+    assert len(config.envconfigs) == 1
+    assert hasattr(config.envconfigs['py1'], 'conda_deps')
+    assert len(config.envconfigs['py1'].conda_deps) == 2
+    assert 'something<42.1' in config.envconfigs['py1'].conda_deps
