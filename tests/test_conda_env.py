@@ -123,3 +123,28 @@ def test_install_conda_no_pip(newconfig, mocksession):
     conda_cmd = pcalls[0].args
     assert 'conda' in os.path.split(conda_cmd[0])[-1]
     assert conda_cmd[1:5] == ['install', '--yes', '-p', venv.path]
+
+
+def test_update(tmpdir, newconfig, mocksession):
+    pkg = tmpdir.ensure("package.tar.gz")
+    config = newconfig(
+        [],
+        """
+        [testenv:py123]
+        deps=
+            numpy
+            astropy
+        conda_deps=
+            pytest
+            asdf
+    """,
+    )
+
+    venv, action, pcalls = create_test_env(config, mocksession, 'py123')
+    tox_testenv_install_deps(action=action, venv=venv)
+
+    venv.hook.tox_testenv_create = tox_testenv_create
+    venv.hook.tox_testenv_install_deps = tox_testenv_install_deps
+    action = mocksession.newaction(venv, "update")
+    venv.update(action)
+    mocksession.installpkg(venv, pkg)
