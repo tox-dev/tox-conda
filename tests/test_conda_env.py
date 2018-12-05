@@ -54,3 +54,44 @@ def test_install_deps_no_conda(newconfig, mocksession):
     assert len(pcalls) == 1
     cmd = pcalls[0].args
     assert cmd[1:4] == ['-m', 'pip', 'install']
+
+
+def test_install_conda_deps(newconfig, mocksession):
+    config = newconfig(
+        [],
+        """
+        [testenv:py123]
+        deps=
+            numpy
+            astropy
+        conda_deps=
+            pytest
+            asdf
+    """,
+    )
+
+    venv = VirtualEnv(config.envconfigs["py123"], session=mocksession)
+    action = mocksession.newaction(venv, "getenv")
+    tox_testenv_create(action=action, venv=venv)
+    pcalls = mocksession._pcalls
+    assert len(pcalls) == 1
+    pcalls[:] = []
+
+    assert len(venv.envconfig.conda_deps) == 2
+    assert len(venv.envconfig.deps) == 2 + len(venv.envconfig.conda_deps)
+
+    tox_testenv_install_deps(action=action, venv=venv)
+    # We expect two calls: one for conda deps, and one for pip deps
+    assert len(pcalls) == 2
+
+    conda_cmd = pcalls[0].args
+    assert 'conda' in os.path.split(conda_cmd[0])[-1]
+    assert conda_cmd[1:5] == ['install', '--yes', '-p', venv.path]
+    # Make sure that python is explicitly given as part of every conda install
+    # in order to avoid inadvertant upgrades of python itself.
+    assert conda_cmd[5].startswith('python=')
+    assert conda_cmd[6:8] == ['pytest', 'asdf']
+
+    pip_cmd = pcalls[1].args
+    assert pip_cmd[1:4] == ['-m', 'pip', 'install']
+    assert pip_cmd[4:6] == ['numpy', 'astropy']
