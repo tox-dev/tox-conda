@@ -26,8 +26,8 @@ def test_conda_deps(tmpdir, newconfig):
     # deps as well. This allows tox to know whether an environment needs to be
     # updated or not. Eventually there may be a cleaner solution.
     assert len(config.envconfigs['py1'].deps) == 3
-    assert 'world' in config.envconfigs['py1'].conda_deps
-    assert 'something' in config.envconfigs['py1'].conda_deps
+    assert 'world' == config.envconfigs['py1'].conda_deps[0].name
+    assert 'something' == config.envconfigs['py1'].conda_deps[1].name
 
 
 def test_no_conda_deps(tmpdir, newconfig):
@@ -80,7 +80,6 @@ def test_conda_channels(tmpdir, newconfig):
     assert 'conda-forge' in config.envconfigs['py1'].conda_channels
 
 
-@pytest.mark.xfail(reason='Option --force-deps not yet implemented for conda-deps')
 def test_conda_force_deps(tmpdir, newconfig):
     config = newconfig(
         ['--force-dep=something<42.1'],
@@ -103,4 +102,4 @@ def test_conda_force_deps(tmpdir, newconfig):
     assert len(config.envconfigs) == 1
     assert hasattr(config.envconfigs['py1'], 'conda_deps')
     assert len(config.envconfigs['py1'].conda_deps) == 2
-    assert 'something<42.1' in config.envconfigs['py1'].conda_deps
+    assert 'something<42.1' == config.envconfigs['py1'].conda_deps[0].name
