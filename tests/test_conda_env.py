@@ -28,6 +28,18 @@ def test_conda_create(newconfig, mocksession):
     assert pcalls[0].args[5].startswith('python=')
 
 
+def create_test_env(config, mocksession, envname):
+
+    venv = VirtualEnv(config.envconfigs[envname], session=mocksession)
+    action = mocksession.newaction(venv, "getenv")
+    tox_testenv_create(action=action, venv=venv)
+    pcalls = mocksession._pcalls
+    assert len(pcalls) == 1
+    pcalls[:] = []
+
+    return venv, action, pcalls
+
+
 def test_install_deps_no_conda(newconfig, mocksession):
     '''Test installation using conda when no conda_deps are given'''
     config = newconfig(
@@ -40,12 +52,7 @@ def test_install_deps_no_conda(newconfig, mocksession):
     """,
     )
 
-    venv = VirtualEnv(config.envconfigs["py123"], session=mocksession)
-    action = mocksession.newaction(venv, "getenv")
-    tox_testenv_create(action=action, venv=venv)
-    pcalls = mocksession._pcalls
-    assert len(pcalls) == 1
-    pcalls[:] = []
+    venv, action, pcalls = create_test_env(config, mocksession, 'py123')
 
     assert len(venv.envconfig.deps) == 2
     assert len(venv.envconfig.conda_deps) == 0
@@ -70,12 +77,7 @@ def test_install_conda_deps(newconfig, mocksession):
     """,
     )
 
-    venv = VirtualEnv(config.envconfigs["py123"], session=mocksession)
-    action = mocksession.newaction(venv, "getenv")
-    tox_testenv_create(action=action, venv=venv)
-    pcalls = mocksession._pcalls
-    assert len(pcalls) == 1
-    pcalls[:] = []
+    venv, action, pcalls = create_test_env(config, mocksession, 'py123')
 
     assert len(venv.envconfig.conda_deps) == 2
     assert len(venv.envconfig.deps) == 2 + len(venv.envconfig.conda_deps)
@@ -108,12 +110,7 @@ def test_install_conda_no_pip(newconfig, mocksession):
     """,
     )
 
-    venv = VirtualEnv(config.envconfigs["py123"], session=mocksession)
-    action = mocksession.newaction(venv, "getenv")
-    tox_testenv_create(action=action, venv=venv)
-    pcalls = mocksession._pcalls
-    assert len(pcalls) == 1
-    pcalls[:] = []
+    venv, action, pcalls = create_test_env(config, mocksession, 'py123')
 
     assert len(venv.envconfig.conda_deps) == 2
     assert len(venv.envconfig.deps) == len(venv.envconfig.conda_deps)
