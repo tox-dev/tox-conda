@@ -95,3 +95,34 @@ def test_install_conda_deps(newconfig, mocksession):
     pip_cmd = pcalls[1].args
     assert pip_cmd[1:4] == ['-m', 'pip', 'install']
     assert pip_cmd[4:6] == ['numpy', 'astropy']
+
+
+def test_install_conda_no_pip(newconfig, mocksession):
+    config = newconfig(
+        [],
+        """
+        [testenv:py123]
+        conda_deps=
+            pytest
+            asdf
+    """,
+    )
+
+    venv = VirtualEnv(config.envconfigs["py123"], session=mocksession)
+    action = mocksession.newaction(venv, "getenv")
+    tox_testenv_create(action=action, venv=venv)
+    pcalls = mocksession._pcalls
+    assert len(pcalls) == 1
+    pcalls[:] = []
+
+    assert len(venv.envconfig.conda_deps) == 2
+    assert len(venv.envconfig.deps) == len(venv.envconfig.conda_deps)
+
+    tox_testenv_install_deps(action=action, venv=venv)
+    # We expect only one call since there are no true pip dependencies
+    assert len(pcalls) == 1
+
+    # Just a quick sanity check for the conda install command
+    conda_cmd = pcalls[0].args
+    assert 'conda' in os.path.split(conda_cmd[0])[-1]
+    assert conda_cmd[1:5] == ['install', '--yes', '-p', venv.path]
