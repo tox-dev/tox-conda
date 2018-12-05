@@ -7,10 +7,15 @@ import pluggy
 import py.path
 
 import tox.venv
-from tox.config import DepConfig
+from tox.config import DepConfig, DepOption
 
 
 hookimpl = pluggy.HookimplMarker('tox')
+
+
+class CondaDepOption(DepOption):
+    name = 'conda_deps'
+    help="each line specifies a conda dependency in pip/setuptools format"
 
 
 def get_py_version(envconfig):
@@ -40,11 +45,7 @@ def get_py_version(envconfig):
 @hookimpl
 def tox_addoption(parser):
 
-    parser.add_testenv_attribute(
-        name="conda_deps",
-        type="line-list",
-        help="each line specifies a conda dependency in conda format"
-    )
+    parser.add_testenv_attribute_obj(CondaDepOption())
 
     parser.add_testenv_attribute(
         name="conda_channels",
@@ -125,7 +126,8 @@ def tox_testenv_create(venv, action):
 def install_conda_deps(venv, action, basepath, envdir):
 
     conda_exe = venv.envconfig.conda_exe
-    conda_deps = venv.envconfig.conda_deps
+    # Account for the fact that we have a list of DepOptions
+    conda_deps = [dep.name for dep in venv.envconfig.conda_deps]
 
     action.setactivity('installcondadeps', ', '.join(conda_deps))
 
