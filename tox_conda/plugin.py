@@ -61,7 +61,7 @@ def tox_configure(config):
     # the conda dependencies when it decides whether an existing environment
     # needs to be updated before being used
     for _, envconfig in config.envconfigs.items():
-        conda_deps = [DepConfig(name) for name in envconfig.conda_deps]
+        conda_deps = [DepConfig(str(name)) for name in envconfig.conda_deps]
         envconfig.deps.extend(conda_deps)
 
 
@@ -127,7 +127,7 @@ def install_conda_deps(venv, action, basepath, envdir):
 
     conda_exe = venv.envconfig.conda_exe
     # Account for the fact that we have a list of DepOptions
-    conda_deps = [dep.name for dep in venv.envconfig.conda_deps]
+    conda_deps = [str(dep.name) for dep in venv.envconfig.conda_deps]
 
     action.setactivity('installcondadeps', ', '.join(conda_deps))
 
