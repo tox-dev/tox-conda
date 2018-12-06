@@ -13,9 +13,9 @@ def read(fname):
 
 setup(
     name='tox-conda',
+    version='0.2.0.dev',
     description='Tox plugin that provides integration with conda',
     long_description=read('README.rst'),
-    version='0.1.0',
     author="Daniel R. D'Avella",
     author_email='ddavella@stsci.edu',
     maintainer='Oliver Bestwalter',
