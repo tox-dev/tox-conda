@@ -38,8 +38,12 @@ package distribution but want to take advantage of the features provided by
 Installation
 ------------
 
-Currently `tox-conda` can only be installed from source. A release on `pypi` is
-expected in the near future.
+The `tox-conda` package is available on `pypi`. To install, simply use the
+following command:
+
+::
+
+   $ pip install tox-conda
 
 To install from source, first clone the project from `github
 <https://github.com/tox-dev/tox-conda>`_:
