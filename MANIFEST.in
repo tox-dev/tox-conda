@@ -5,6 +5,7 @@ include CHANGES.rst
 include setup.cfg
 
 recursive-include docs *
+recursive-include tests *.py
 
 prune build
 prune docs/_build
