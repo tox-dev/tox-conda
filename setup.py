@@ -14,7 +14,7 @@ def read(fname):
 
 setup(
     name="tox-conda",
-    version="0.2.0.dev",
+    version="0.2.0",
     description="Tox plugin that provides integration with conda",
     long_description=read("README.rst"),
     author="Daniel R. D'Avella",
@@ -24,7 +24,7 @@ setup(
     url="https://github.com/tox-dev/tox-conda",
     packages=find_packages(exclude=["tests"]),
     python_requires=">=3.3",
-    install_requires=["tox>=3.0.0"],
+    install_requires=["tox>=3.8.1"],
     entry_points={"tox": ["conda = tox_conda.plugin"]},
     license="MIT",
     classifiers=[

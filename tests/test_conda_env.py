@@ -1,4 +1,3 @@
-import glob
 import os
 
 from tox.venv import VirtualEnv
@@ -13,7 +12,7 @@ def test_conda_create(newconfig, mocksession):
     """,
     )
 
-    venv = VirtualEnv(config.envconfigs["py123"], session=mocksession)
+    venv = VirtualEnv(config.envconfigs["py123"])
     assert venv.path == config.envconfigs["py123"].envdir
 
     action = mocksession.newaction(venv, "getenv")
@@ -30,7 +29,7 @@ def test_conda_create(newconfig, mocksession):
 
 def create_test_env(config, mocksession, envname):
 
-    venv = VirtualEnv(config.envconfigs[envname], session=mocksession)
+    venv = VirtualEnv(config.envconfigs[envname])
     action = mocksession.newaction(venv, "getenv")
     tox_testenv_create(action=action, venv=venv)
     pcalls = mocksession._pcalls
@@ -147,4 +146,4 @@ def test_update(tmpdir, newconfig, mocksession):
     venv.hook.tox_testenv_install_deps = tox_testenv_install_deps
     action = mocksession.newaction(venv, "update")
     venv.update(action)
-    mocksession.installpkg(venv, pkg)
+    venv.installpkg(pkg, action)

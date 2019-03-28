@@ -7,6 +7,7 @@ import py.path
 
 import tox.venv
 from tox.config import DepConfig, DepOption
+from tox.exception import InvocationError
 
 hookimpl = pluggy.HookimplMarker("tox")
 
@@ -16,7 +17,7 @@ class CondaDepOption(DepOption):
     help = "each line specifies a conda dependency in pip/setuptools format"
 
 
-def get_py_version(envconfig):
+def get_py_version(envconfig, action):
 
     # Try to use basepython
     match = re.match(r"python(\d)(?:\.(\d))?", envconfig.basepython)
@@ -32,9 +33,10 @@ def get_py_version(envconfig):
 
     # Second fallback
     else:
-        code = 'import sys; print("{}.{}".format(*sys.version_info[:2]))'
-        args = [envconfig.basepython, "-c", code]
-        result = sp.check_output(args)
+        code = "import sys; print('{}.{}'.format(*sys.version_info[:2]))"
+        result = action.popen(
+            [envconfig.basepython, "-c", code], report_fail=True, returnout=True
+        )
         version = result.decode("utf-8").strip()
 
     return "python={}".format(version)
@@ -63,7 +65,7 @@ def tox_configure(config):
         envconfig.deps.extend(conda_deps)
 
 
-def find_conda():
+def find_conda(action):
 
     # This should work if we're not already in an environment
     conda_exe = os.environ.get("_CONDA_EXE")
@@ -75,9 +77,11 @@ def find_conda():
     if conda_exe:
         return conda_exe
 
-    # Try a simple fallback
-    if sp.call(["conda", "-h"], stdout=sp.PIPE, stderr=sp.PIPE) == 0:
+    try:
+        action.popen(["conda", "-h"], report_fail=True, returnout=False)
         return "conda"
+    except InvocationError:
+        pass
 
     raise RuntimeError("Can't locate conda executable")
 
@@ -95,16 +99,16 @@ def venv_lookup(self, name):
 @hookimpl
 def tox_testenv_create(venv, action):
 
-    venv.session.make_emptydir(venv.path)
+    tox.venv.cleanup_for_venv(venv)
     basepath = venv.path.dirpath()
 
     # Check for venv.envconfig.sitepackages and venv.config.alwayscopy here
 
-    conda_exe = find_conda()
+    conda_exe = find_conda(action)
     venv.envconfig.conda_exe = conda_exe
 
     envdir = venv.envconfig.envdir
-    python = get_py_version(venv.envconfig)
+    python = get_py_version(venv.envconfig, action)
 
     # This is a workaround for locating the Python executable in Conda
     # environments on Windows.

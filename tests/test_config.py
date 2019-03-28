@@ -1,6 +1,3 @@
-import pytest
-
-
 def test_conda_deps(tmpdir, newconfig):
     config = newconfig(
         [],
