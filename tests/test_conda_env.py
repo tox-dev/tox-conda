@@ -15,25 +15,26 @@ def test_conda_create(newconfig, mocksession):
     venv = VirtualEnv(config.envconfigs["py123"])
     assert venv.path == config.envconfigs["py123"].envdir
 
-    action = mocksession.newaction(venv, "getenv")
-    tox_testenv_create(action=action, venv=venv)
+    with mocksession.newaction(venv.name, "getenv") as action:
+        tox_testenv_create(action=action, venv=venv)
     pcalls = mocksession._pcalls
-    assert len(pcalls) == 1
-    assert "conda" in pcalls[0].args[0]
-    assert "create" == pcalls[0].args[1]
-    assert "--yes" == pcalls[0].args[2]
-    assert "-p" == pcalls[0].args[3]
-    assert venv.path == pcalls[0].args[4]
-    assert pcalls[0].args[5].startswith("python=")
+    assert len(pcalls) >= 1
+    call = pcalls[-1]
+    assert "conda" in call.args[0]
+    assert "create" == call.args[1]
+    assert "--yes" == call.args[2]
+    assert "-p" == call.args[3]
+    assert venv.path == call.args[4]
+    assert call.args[5].startswith("python=")
 
 
 def create_test_env(config, mocksession, envname):
 
     venv = VirtualEnv(config.envconfigs[envname])
-    action = mocksession.newaction(venv, "getenv")
-    tox_testenv_create(action=action, venv=venv)
+    with mocksession.newaction(venv.name, "getenv") as action:
+        tox_testenv_create(action=action, venv=venv)
     pcalls = mocksession._pcalls
-    assert len(pcalls) == 1
+    assert len(pcalls) >= 1
     pcalls[:] = []
 
     return venv, action, pcalls
@@ -57,8 +58,9 @@ def test_install_deps_no_conda(newconfig, mocksession):
     assert len(venv.envconfig.conda_deps) == 0
 
     tox_testenv_install_deps(action=action, venv=venv)
-    assert len(pcalls) == 1
-    cmd = pcalls[0].args
+    assert len(pcalls) >= 1
+    call = pcalls[-1]
+    cmd = call.args
     assert cmd[1:4] == ["-m", "pip", "install"]
 
 
@@ -83,9 +85,9 @@ def test_install_conda_deps(newconfig, mocksession):
 
     tox_testenv_install_deps(action=action, venv=venv)
     # We expect two calls: one for conda deps, and one for pip deps
-    assert len(pcalls) == 2
-
-    conda_cmd = pcalls[0].args
+    assert len(pcalls) >= 2
+    call = pcalls[-2]
+    conda_cmd = call.args
     assert "conda" in os.path.split(conda_cmd[0])[-1]
     assert conda_cmd[1:5] == ["install", "--yes", "-p", venv.path]
     # Make sure that python is explicitly given as part of every conda install
@@ -93,7 +95,7 @@ def test_install_conda_deps(newconfig, mocksession):
     assert conda_cmd[5].startswith("python=")
     assert conda_cmd[6:8] == ["pytest", "asdf"]
 
-    pip_cmd = pcalls[1].args
+    pip_cmd = pcalls[-1].args
     assert pip_cmd[1:4] == ["-m", "pip", "install"]
     assert pip_cmd[4:6] == ["numpy", "astropy"]
 
@@ -116,10 +118,11 @@ def test_install_conda_no_pip(newconfig, mocksession):
 
     tox_testenv_install_deps(action=action, venv=venv)
     # We expect only one call since there are no true pip dependencies
-    assert len(pcalls) == 1
+    assert len(pcalls) >= 1
 
     # Just a quick sanity check for the conda install command
-    conda_cmd = pcalls[0].args
+    call = pcalls[-1]
+    conda_cmd = call.args
     assert "conda" in os.path.split(conda_cmd[0])[-1]
     assert conda_cmd[1:5] == ["install", "--yes", "-p", venv.path]
 
@@ -144,6 +147,6 @@ def test_update(tmpdir, newconfig, mocksession):
 
     venv.hook.tox_testenv_create = tox_testenv_create
     venv.hook.tox_testenv_install_deps = tox_testenv_install_deps
-    action = mocksession.newaction(venv, "update")
-    venv.update(action)
-    venv.installpkg(pkg, action)
+    with mocksession.newaction(venv.name, "update") as action:
+        venv.update(action)
+        venv.installpkg(pkg, action)
