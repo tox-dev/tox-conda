@@ -2,40 +2,43 @@
 # http://www.appveyor.com/docs/installed-software#python
 
 environment:
+  PYTHONUNBUFFERED: 1
+  MINICONDA: C:\\Miniconda3-x64
   matrix:
-    - PYTHON: "C:\\Python27"
-      TOX_ENV: "py27"
 
-    - PYTHON: "C:\\Python34"
-      TOX_ENV: "py34"
+  - PYTHON: "C:\\Python34"
+    TOX_ENV: "py34"
 
-    - PYTHON: "C:\\Python35"
-      TOX_ENV: "py35"
+  - PYTHON: "C:\\Python35"
+    TOX_ENV: "py35"
 
-    - PYTHON: "C:\\Python36"
-      TOX_ENV: "py36"
+  - PYTHON: "C:\\Python36"
+    TOX_ENV: "py36"
+
+  - PYTHON: "C:\\Python37"
+    TOX_ENV: "py37"
 
 
 init:
-  - "%PYTHON%/python -V"
-  - "%PYTHON%/python -c \"import struct;print( 8 * struct.calcsize(\'P\'))\""
+- "%PYTHON%/python -V"
+- mkdir C:\Users\appveyor\.conda
+- call %MINICONDA%\Scripts\activate.bat
 
 install:
-  - "%PYTHON%/Scripts/easy_install -U pip"
-  - "%PYTHON%/Scripts/pip install tox"
-  - "%PYTHON%/Scripts/pip install wheel"
+- "%PYTHON%/Scripts/pip install -U --user pip"
+- "%PYTHON%/Scripts/pip install -U --user tox wheel"
 
 build: false  # Not a C# project, build stuff at the test step instead.
 
 test_script:
-  - "%PYTHON%/Scripts/tox -e %TOX_ENV%"
+- "%PYTHON%/python -m tox -e %TOX_ENV%"
 
 after_test:
-  - "%PYTHON%/python setup.py bdist_wheel"
-  - ps: "ls dist"
+- "%PYTHON%/python setup.py bdist_wheel"
+- ps: "ls dist"
 
 artifacts:
-  - path: dist\*
+- path: dist\*
 
 #on_success:
 #  - TODO: upload the content of dist/*.whl to a public wheelhouse

@@ -21,24 +21,24 @@ tox-conda
     :target: https://ci.appveyor.com/project/tox-dev/tox-conda/branch/master
     :alt: See Build Status on AppVeyor
 
-`tox-conda` is a plugin that provides integration with the `conda
+``tox-conda`` is a plugin that provides integration with the `conda
 <https://conda.io>`_ package and environment manager for the `tox
 <https://tox.readthedocs.io>`_ automation tool. It's like having your cake and
 eating it, too!
 
-By default, `tox` creates isolated environments using `virtualenv
-<https://virtualenv.pypa.io>`_ and installs dependencies from `pip`.
+By default, ``tox`` creates isolated environments using `virtualenv
+<https://virtualenv.pypa.io>`_ and installs dependencies from ``pip``.
 
-In contrast, when using the `tox-conda` plugin `tox` will use `conda` to create
-environments, and will install specified dependencies from `conda`. This is
-useful for developers who rely on `conda` for environment management and
+In contrast, when using the ``tox-conda`` plugin ``tox`` will use ``conda`` to create
+environments, and will install specified dependencies from ``conda``. This is
+useful for developers who rely on ``conda`` for environment management and
 package distribution but want to take advantage of the features provided by
-`tox` for test automation.
+``tox`` for test automation.
 
 Installation
 ------------
 
-The `tox-conda` package is available on `pypi`. To install, simply use the
+The ``tox-conda`` package is available on ``pypi``. To install, simply use the
 following command:
 
 ::
@@ -64,29 +64,29 @@ mode <https://packaging.python.org/tutorials/distributing-packages/#working-in-d
 
    $ pip install -e .
 
-The `tox-conda` plugin expects that `tox` and `conda` are already installed and
+The ``tox-conda`` plugin expects that ``tox`` and ``conda`` are already installed and
 available in your working environment.
 
 Usage
 -----
 
-Details on `tox` usage can be found in the `tox documentation
+Details on ``tox`` usage can be found in the `tox documentation
 <https://tox.readthedocs.io>`_.
 
-With the plugin installed and no other changes, the `tox-conda` plugin will use
-`conda` to create environments and use `pip` to install dependencies that are
-given in the `tox.ini` configuration file.
+With the plugin installed and no other changes, the ``tox-conda`` plugin will use
+``conda`` to create environments and use ``pip`` to install dependencies that are
+given in the ``tox.ini`` configuration file.
 
-`tox-conda` adds two additional (and optional) settings to the `[testenv]`
+``tox-conda`` adds two additional (and optional) settings to the ``[testenv]``
 section of configuration files:
 
-* `conda_deps`, which is used to configure which dependencies are installed
-  from `conda` instead of from `pip`. All dependencies in `conda_deps` are
-  installed before all dependencies in `deps`. If not given, no dependencies
-  will be installed using `conda`.
+* ``conda_deps``, which is used to configure which dependencies are installed
+  from ``conda`` instead of from ``pip``. All dependencies in ``conda_deps`` are
+  installed before all dependencies in ``deps``. If not given, no dependencies
+  will be installed using ``conda``.
 
-* `conda_channels`, which specifies which channel(s) should be used for
-  resolving `conda` dependencies. If not given, only the `default` channel will
+* ``conda_channels``, which specifies which channel(s) should be used for
+  resolving ``conda`` dependencies. If not given, only the ``default`` channel will
   be used.
 
 An example configuration file is given below:
@@ -110,7 +110,7 @@ An example configuration file is given below:
    commands=
        pytest {posargs}
 
-More information on `tox` configuration files can be found in the
+More information on ``tox`` configuration files can be found in the
 `documentation <https://tox.readthedocs.io/en/latest/config.html>`_.
 
 Contributing
