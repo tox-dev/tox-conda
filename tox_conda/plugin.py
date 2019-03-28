@@ -34,9 +34,7 @@ def get_py_version(envconfig, action):
     # Second fallback
     else:
         code = "import sys; print('{}.{}'.format(*sys.version_info[:2]))"
-        result = action.popen(
-            [envconfig.basepython, "-c", code], report_fail=True, returnout=True
-        )
+        result = action.popen([envconfig.basepython, "-c", code], report_fail=True, returnout=True)
         version = result.decode("utf-8").strip()
 
     return "python={}".format(version)
@@ -48,9 +46,7 @@ def tox_addoption(parser):
     parser.add_testenv_attribute_obj(CondaDepOption())
 
     parser.add_testenv_attribute(
-        name="conda_channels",
-        type="line-list",
-        help="each line specifies a conda channel",
+        name="conda_channels", type="line-list", help="each line specifies a conda channel"
     )
 
 
