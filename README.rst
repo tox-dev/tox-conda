@@ -23,7 +23,7 @@ tox-conda
 
 ``tox-conda`` is a plugin that provides integration with the `conda
 <https://conda.io>`_ package and environment manager for the `tox
-<https://tox.readthedocs.io>`_ automation tool. It's like having your cake and
+<https://tox.readthedocs.io>`__ automation tool. It's like having your cake and
 eating it, too!
 
 By default, ``tox`` creates isolated environments using `virtualenv
