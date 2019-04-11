@@ -49,6 +49,10 @@ def tox_addoption(parser):
         name="conda_channels", type="line-list", help="each line specifies a conda channel"
     )
 
+    parser.add_testenv_attribute(
+        name="conda_env", type="bool", help="always use a conda environment", default=True
+    )
+
 
 @hookimpl
 def tox_configure(config):
@@ -97,6 +101,10 @@ def tox_testenv_create(venv, action):
 
     tox.venv.cleanup_for_venv(venv)
     basepath = venv.path.dirpath()
+
+    # Don't use conda if it is not specified.
+    if not venv.envconfig.conda_deps and not venv.envconfig.conda_env:
+        return None
 
     # Check for venv.envconfig.sitepackages and venv.config.alwayscopy here
 
