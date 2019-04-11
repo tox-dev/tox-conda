@@ -29,10 +29,10 @@ eating it, too!
 By default, ``tox`` creates isolated environments using `virtualenv
 <https://virtualenv.pypa.io>`_ and installs dependencies from ``pip``.
 
-In contrast, when using the ``tox-conda`` plugin ``tox`` will use ``conda`` to create
-environments, and will install specified dependencies from ``conda``. This is
-useful for developers who rely on ``conda`` for environment management and
-package distribution but want to take advantage of the features provided by
+With the ``tox-conda`` plugin, ``tox`` can be configured to use ``conda`` to
+create environments, and will install specified dependencies from ``conda``.
+This is useful for developers who rely on ``conda`` for environment management
+and package distribution but want to take advantage of the features provided by
 ``tox`` for test automation.
 
 Installation
@@ -73,11 +73,10 @@ Usage
 Details on ``tox`` usage can be found in the `tox documentation
 <https://tox.readthedocs.io>`_.
 
-With the plugin installed and no other changes, the ``tox-conda`` plugin will use
-``conda`` to create environments and use ``pip`` to install dependencies that are
-given in the ``tox.ini`` configuration file.
+With the plugin installed, ``tox-conda`` plugin enables using ``conda`` to create
+environments and/or to install dependencies.
 
-``tox-conda`` adds two additional (and optional) settings to the ``[testenv]``
+``tox-conda`` adds three additional (and optional) settings to the ``[testenv]``
 section of configuration files:
 
 * ``conda_deps``, which is used to configure which dependencies are installed
@@ -88,6 +87,11 @@ section of configuration files:
 * ``conda_channels``, which specifies which channel(s) should be used for
   resolving ``conda`` dependencies. If not given, only the ``default`` channel will
   be used.
+
+* ``conda_env``, which can be used to explicitly create environments using ``conda``,
+  even if ``conda_deps`` is missing. If ``conda_deps`` is present, it takes precedence
+  over ``conda_env`` and ``conda`` will be used for environment creation. Defaults to
+  ``False``.
 
 An example configuration file is given below:
 
