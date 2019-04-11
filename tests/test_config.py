@@ -100,3 +100,46 @@ def test_conda_force_deps(tmpdir, newconfig):
     assert hasattr(config.envconfigs["py1"], "conda_deps")
     assert len(config.envconfigs["py1"].conda_deps) == 2
     assert "something<42.1" == config.envconfigs["py1"].conda_deps[0].name
+
+
+def test_conda_env(tmpdir, newconfig):
+    config = newconfig(
+        [],
+        """
+        [tox]
+        toxworkdir = {}
+        [testenv:py1]
+        conda_env=True
+        deps=
+            hello
+    """.format(
+            tmpdir
+        ),
+    )
+
+    assert len(config.envconfigs) == 1
+    assert hasattr(config.envconfigs["py1"], "deps")
+    assert hasattr(config.envconfigs["py1"], "conda_deps")
+    assert hasattr(config.envconfigs["py1"], "conda_env")
+    assert config.envconfigs["py1"].conda_env
+
+
+def test_no_conda_env(tmpdir, newconfig):
+    config = newconfig(
+        [],
+        """
+        [tox]
+        toxworkdir = {}
+        [testenv:py1]
+        deps=
+            hello
+    """.format(
+            tmpdir
+        ),
+    )
+
+    assert len(config.envconfigs) == 1
+    assert hasattr(config.envconfigs["py1"], "deps")
+    assert hasattr(config.envconfigs["py1"], "conda_deps")
+    assert hasattr(config.envconfigs["py1"], "conda_env")
+    assert not config.envconfigs["py1"].conda_env
