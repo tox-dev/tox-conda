@@ -29,6 +29,53 @@ def test_conda_create(newconfig, mocksession):
     assert call.args[5].startswith("python=")
 
 
+def test_create_no_conda(newconfig, mocksession):
+    config = newconfig(
+        [],
+        """
+        [testenv:py123]
+        conda_env=False
+    """,
+    )
+
+    venv = VirtualEnv(config.envconfigs["py123"])
+    assert venv.path == config.envconfigs["py123"].envdir
+
+    with mocksession.newaction(venv.name, "getenv") as action:
+        ret = tox_testenv_create(action=action, venv=venv)
+    assert ret is None
+    pcalls = mocksession._pcalls
+    assert not pcalls
+
+
+def test_create_force_conda(newconfig, mocksession):
+    """Test that conda_env is overridden when conda_deps are given"""
+    config = newconfig(
+        [],
+        """
+        [testenv:py123]
+        conda_env=False
+        conda_deps =
+            pytest
+    """,
+    )
+
+    venv = VirtualEnv(config.envconfigs["py123"])
+    assert venv.path == config.envconfigs["py123"].envdir
+
+    with mocksession.newaction(venv.name, "getenv") as action:
+        tox_testenv_create(action=action, venv=venv)
+    pcalls = mocksession._pcalls
+    assert len(pcalls) >= 1
+    call = pcalls[-1]
+    assert "conda" in call.args[0]
+    assert "create" == call.args[1]
+    assert "--yes" == call.args[2]
+    assert "-p" == call.args[3]
+    assert venv.path == call.args[4]
+    assert call.args[5].startswith("python=")
+
+
 def create_test_env(config, mocksession, envname):
 
     venv = VirtualEnv(config.envconfigs[envname])
