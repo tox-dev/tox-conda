@@ -9,6 +9,7 @@ def test_conda_create(newconfig, mocksession):
         [],
         """
         [testenv:py123]
+        conda_env=True
     """,
     )
 
@@ -46,6 +47,7 @@ def test_install_deps_no_conda(newconfig, mocksession):
         [],
         """
         [testenv:py123]
+        conda_env=True
         deps=
             numpy
             astropy
@@ -69,6 +71,7 @@ def test_install_conda_deps(newconfig, mocksession):
         [],
         """
         [testenv:py123]
+        conda_env=True
         deps=
             numpy
             astropy
@@ -105,6 +108,7 @@ def test_install_conda_no_pip(newconfig, mocksession):
         [],
         """
         [testenv:py123]
+        conda_env=True
         conda_deps=
             pytest
             asdf
@@ -133,6 +137,7 @@ def test_update(tmpdir, newconfig, mocksession):
         [],
         """
         [testenv:py123]
+        conda_env=True
         deps=
             numpy
             astropy

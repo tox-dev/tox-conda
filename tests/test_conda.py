@@ -6,6 +6,7 @@ def test_conda(cmd, initproj):
                 [tox]
                 skipsdist=True
                 [testenv]
+                conda_env=True
                 commands = python -c 'import sys, os; \
                     print(os.path.exists(os.path.join(sys.prefix, "conda-meta")))'
             """

@@ -50,7 +50,7 @@ def tox_addoption(parser):
     )
 
     parser.add_testenv_attribute(
-        name="conda_env", type="bool", help="always use a conda environment", default=True
+        name="conda_env", type="bool", help="always use a conda environment", default=False
     )
 
 
