@@ -35,6 +35,28 @@ useful for developers who rely on ``conda`` for environment management and
 package distribution but want to take advantage of the features provided by
 ``tox`` for test automation.
 
+Getting Started
+---------------
+
+``tox-conda`` can be used in one of two ways: by installing it globally and by
+enabling it on a per-project basis. When the plugin is installed globally, the
+default behavior of ``tox`` will be to use ``conda`` to create environments. To
+use it on a per-project basis instead, use ``tox``'s auto-provisioning feature
+to selectively enable the plugin.
+
+To enable the use of ``tox-conda`` by default, follow the `Installation`_
+instructions. To use the plugin selectively, do not manually install it, but
+instead enable it by adding ``tox-conda`` as a provisioning requirement to a
+project's ``tox`` config:
+
+::
+
+    [tox]
+    requires = tox-conda
+
+More information on auto-provisioning can be found in the `tox documentation
+<https://tox.readthedocs.io/en/latest/example/basic.html#tox-auto-provisioning>`_.
+
 Installation
 ------------
 
@@ -73,7 +95,7 @@ Usage
 Details on ``tox`` usage can be found in the `tox documentation
 <https://tox.readthedocs.io>`_.
 
-With the plugin installed and no other changes, the ``tox-conda`` plugin will use
+With the plugin enabled and no other changes, the ``tox-conda`` plugin will use
 ``conda`` to create environments and use ``pip`` to install dependencies that are
 given in the ``tox.ini`` configuration file.
 
