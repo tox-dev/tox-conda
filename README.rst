@@ -55,7 +55,7 @@ project's ``tox`` config:
     requires = tox-conda
 
 More information on auto-provisioning can be found in the `tox documentation
-<https://tox.readthedocs.io/en/latest/example/basic.html#tox-auto-provisioning>`_.
+<https://tox.readthedocs.io/en/latest/example/basic.html#tox-auto-provisioning>`__.
 
 Installation
 ------------
