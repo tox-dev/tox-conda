@@ -18,7 +18,6 @@ class CondaDepOption(DepOption):
 
 
 def get_py_version(envconfig, action):
-
     # Try to use basepython
     match = re.match(r"python(\d)(?:\.(\d))?", envconfig.basepython)
     if match:
@@ -42,7 +41,6 @@ def get_py_version(envconfig, action):
 
 @hookimpl
 def tox_addoption(parser):
-
     parser.add_testenv_attribute_obj(CondaDepOption())
 
     parser.add_testenv_attribute(
@@ -52,7 +50,6 @@ def tox_addoption(parser):
 
 @hookimpl
 def tox_configure(config):
-
     # This is a pretty cheesy workaround. It allows tox to consider changes to
     # the conda dependencies when it decides whether an existing environment
     # needs to be updated before being used
@@ -62,7 +59,6 @@ def tox_configure(config):
 
 
 def find_conda(action):
-
     # This should work if we're not already in an environment
     conda_exe = os.environ.get("_CONDA_EXE")
     if conda_exe:
@@ -83,7 +79,6 @@ def find_conda(action):
 
 
 def venv_lookup(self, name):
-
     # In Conda environments on Windows, the Python executable is installed in
     # the top-level environment directory, as opposed to virtualenvs, where it
     # is installed in the Scripts directory. Tox assumes that looking in the
@@ -94,7 +89,6 @@ def venv_lookup(self, name):
 
 @hookimpl
 def tox_testenv_create(venv, action):
-
     tox.venv.cleanup_for_venv(venv)
     basepath = venv.path.dirpath()
 
@@ -122,7 +116,6 @@ def tox_testenv_create(venv, action):
 
 
 def install_conda_deps(venv, action, basepath, envdir):
-
     conda_exe = venv.envconfig.conda_exe
     # Account for the fact that we have a list of DepOptions
     conda_deps = [str(dep.name) for dep in venv.envconfig.conda_deps]
@@ -143,12 +136,11 @@ def install_conda_deps(venv, action, basepath, envdir):
 
 @hookimpl
 def tox_testenv_install_deps(venv, action):
-
     basepath = venv.path.dirpath()
     envdir = venv.envconfig.envdir
     # Save for later : we will need it for the config file
     import copy
-    saved_deps=copy.deepcopy(venv.envconfig.deps)
+    saved_deps = copy.deepcopy(venv.envconfig.deps)
 
     num_conda_deps = len(venv.envconfig.conda_deps)
     if num_conda_deps > 0:
@@ -161,5 +153,21 @@ def tox_testenv_install_deps(venv, action):
     # Install dependencies from pypi here
     tox.venv.tox_testenv_install_deps(venv=venv, action=action)
     # Restore for the config file
-    venv.envconfig.deps=saved_deps
+    venv.envconfig.deps = saved_deps
     return True
+
+
+@hookimpl
+def tox_get_python_executable(envconfig):
+    conda_python_path = os.path.join(str(envconfig.envdir), "python.exe")
+    if os.path.exists(conda_python_path):
+        return conda_python_path
+    else:
+        return None
+
+
+@hookimpl
+def tox_package(session, venv):
+    # This is a workaround for locating the Python executable in Conda
+    # environments on Windows.
+    venv._venv_lookup = types.MethodType(venv_lookup, venv)
