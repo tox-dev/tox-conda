@@ -122,7 +122,7 @@ def install_conda_deps(venv, action, basepath, envdir):
 
     action.setactivity("installcondadeps", ", ".join(conda_deps))
 
-    args = [conda_exe, "install", "--yes", "-p", envdir]
+    args = [conda_exe, "install", "--quiet", "--yes", "-p", envdir]
     for channel in venv.envconfig.conda_channels:
         args += ["--channel", channel]
     # We include the python version in the conda requirements in order to make
