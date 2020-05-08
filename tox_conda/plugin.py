@@ -122,6 +122,7 @@ def install_conda_deps(venv, action, basepath, envdir):
 
     action.setactivity("installcondadeps", ", ".join(conda_deps))
 
+    # Install quietly to make the log cleaner
     args = [conda_exe, "install", "--quiet", "--yes", "-p", envdir]
     for channel in venv.envconfig.conda_channels:
         args += ["--channel", channel]
