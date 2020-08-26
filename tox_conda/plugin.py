@@ -42,6 +42,13 @@ def get_py_version(envconfig, action):
 
 @hookimpl
 def tox_addoption(parser):
+    parser. add_testenv_attribute(
+        name="conda_env", type="path", help="specify a conda environment.yml file"
+    )
+    parser. add_testenv_attribute(
+        name="conda_spec", type="path", help="specify a conda spec-file.txt file"
+    )
+
     parser.add_testenv_attribute_obj(CondaDepOption())
 
     parser.add_testenv_attribute(
@@ -56,6 +63,10 @@ def tox_configure(config):
     # needs to be updated before being used
     for _, envconfig in config.envconfigs.items():
         conda_deps = [DepConfig(str(name)) for name in envconfig.conda_deps]
+        # Add the conda-spec.txt file to the end of the conda deps b/c any deps
+        # after --file option(s) are ignored
+        if envconfig.conda_spec:
+            conda_deps.append(DepConfig("--file={}".format(envconfig.conda_spec)))
         envconfig.deps.extend(conda_deps)
 
 
@@ -93,10 +104,17 @@ def tox_testenv_create(venv, action):
     envdir = venv.envconfig.envdir
     python = get_py_version(venv.envconfig, action)
 
-    args = [conda_exe, "create", "--yes", "-p", envdir]
-    for channel in venv.envconfig.conda_channels:
-        args += ["--channel", channel]
-    args += [python]
+    if venv.envconfig.conda_env:
+        # conda env create does not have a --channel argument nor does it take
+        # dependencies specifications (e.g., python=3.8). These must all be specified
+        # in the conda-env.yml file
+        args = [conda_exe, "env", "create", "-p", envdir, "--file", venv.envconfig.conda_env]
+    else:
+        args = [conda_exe, "create", "--yes", "-p", envdir]
+        for channel in venv.envconfig.conda_channels:
+            args += ["--channel", channel]
+        args += [python]
+
     venv._pcall(args, venv=False, action=action, cwd=basepath)
 
     venv.envconfig.conda_python = python
