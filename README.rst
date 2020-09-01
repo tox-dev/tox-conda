@@ -121,7 +121,7 @@ section of configuration files:
 * ``conda_env``, which specifies a ``conda-env.yml`` file to create a base conda
   environment for the test. The ``conda-env.yml`` file is self-contained and
   if the desired python version and conda channels to use is not given, the latest
-  python version and default channels will be used. The above ``conda_deps``,
+  python version (if needed) and default channels will be used. The above ``conda_deps``,
   ``conda_channels``, and ``conda_spec`` arguments, if used in conjunction with
   a ``conda-env.yml`` file, will be used to *update* the environment *after* the
   initial environment creation.
