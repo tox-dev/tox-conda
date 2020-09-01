@@ -62,6 +62,10 @@ def tox_configure(config):
     # the conda dependencies when it decides whether an existing environment
     # needs to be updated before being used
     for _, envconfig in config.envconfigs.items():
+        # Make sure the right environment is activated. This works because we're
+        # creating environments using the `-p/--prefix` option in `tox_testenv_create`
+        envconfig.setenv['CONDA_DEFAULT_ENV'] = envconfig.setenv['TOX_ENV_DIR']
+
         conda_deps = [DepConfig(str(name)) for name in envconfig.conda_deps]
         # Add the conda-spec.txt file to the end of the conda deps b/c any deps
         # after --file option(s) are ignored
@@ -97,7 +101,6 @@ def tox_testenv_create(venv, action):
     basepath = venv.path.dirpath()
 
     # Check for venv.envconfig.sitepackages and venv.config.alwayscopy here
-
     conda_exe = find_conda(action)
     venv.envconfig.conda_exe = conda_exe
 
