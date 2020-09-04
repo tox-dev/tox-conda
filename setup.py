@@ -24,7 +24,16 @@ setup(
     url="https://github.com/tox-dev/tox-conda",
     packages=find_packages(exclude=["tests"]),
     python_requires=">=3.3",
-    install_requires=["tox>=3.8.1"],
+    install_requires=["tox>=3.12.2"],
+    extras_require={
+        'testing': [
+            'pytest>=4.0.0,<6',
+            'pytest-cov>=2.5.1,<3',
+            'pytest-mock>=1.10.0,<2',
+            'pytest-timeout',
+            'pytest-xdist>=1.22.2,<2',
+        ]
+    },
     entry_points={"tox": ["conda = tox_conda.plugin"]},
     license="MIT",
     classifiers=[
@@ -37,6 +46,8 @@ setup(
         "Programming Language :: Python :: 3.4",
         "Programming Language :: Python :: 3.5",
         "Programming Language :: Python :: 3.6",
+        "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: Implementation :: CPython",
         "Programming Language :: Python :: Implementation :: PyPy",
         "Operating System :: OS Independent",

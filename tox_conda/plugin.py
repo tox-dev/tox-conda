@@ -4,7 +4,6 @@ import types
 
 import pluggy
 import py.path
-
 import tox.venv
 from tox.config import DepConfig, DepOption
 from tox.exception import InvocationError
@@ -140,6 +139,7 @@ def tox_testenv_install_deps(venv, action):
     envdir = venv.envconfig.envdir
     # Save for later : we will need it for the config file
     import copy
+
     saved_deps = copy.deepcopy(venv.envconfig.deps)
 
     num_conda_deps = len(venv.envconfig.conda_deps)
