@@ -100,6 +100,12 @@ def tox_testenv_create(venv, action):
 
     venv.envconfig.conda_python = python
 
+    # let the venv know about the target interpreter just installed in our conda env, otherwise
+    # we'll have a mismatch later because tox expects the interpreter to be existing outside of
+    # the env
+    del venv.envconfig.config.interpreters.name2executable[venv.name]
+    venv.envconfig.config.interpreters.get_executable(venv.envconfig)
+
     return True
 
 
