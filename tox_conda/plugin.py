@@ -1,13 +1,14 @@
+import copy
 import os
 import re
-import types
 
 import pluggy
 import py.path
 
-import tox.venv
-from tox.config import DepConfig, DepOption
+import tox
+from tox.config import DepConfig, DepOption, TestenvConfig
 from tox.exception import InvocationError
+from tox.venv import VirtualEnv
 
 hookimpl = pluggy.HookimplMarker("tox")
 
@@ -78,15 +79,6 @@ def find_conda(action):
     raise RuntimeError("Can't locate conda executable")
 
 
-def venv_lookup(self, name):
-    # In Conda environments on Windows, the Python executable is installed in
-    # the top-level environment directory, as opposed to virtualenvs, where it
-    # is installed in the Scripts directory. Tox assumes that looking in the
-    # Scripts directory is sufficient, which is why this workaround is required.
-    paths = [self.envconfig.envdir, self.envconfig.envbindir]
-    return py.path.local.sysfind(name, paths=paths)
-
-
 @hookimpl
 def tox_testenv_create(venv, action):
     tox.venv.cleanup_for_venv(venv)
@@ -99,10 +91,6 @@ def tox_testenv_create(venv, action):
 
     envdir = venv.envconfig.envdir
     python = get_py_version(venv.envconfig, action)
-
-    # This is a workaround for locating the Python executable in Conda
-    # environments on Windows.
-    venv._venv_lookup = types.MethodType(venv_lookup, venv)
 
     args = [conda_exe, "create", "--yes", "-p", envdir]
     for channel in venv.envconfig.conda_channels:
@@ -139,7 +127,6 @@ def tox_testenv_install_deps(venv, action):
     basepath = venv.path.dirpath()
     envdir = venv.envconfig.envdir
     # Save for later : we will need it for the config file
-    import copy
     saved_deps = copy.deepcopy(venv.envconfig.deps)
 
     num_conda_deps = len(venv.envconfig.conda_deps)
@@ -166,8 +153,31 @@ def tox_get_python_executable(envconfig):
         return None
 
 
-@hookimpl
-def tox_package(session, venv):
-    # This is a workaround for locating the Python executable in Conda
-    # environments on Windows.
-    venv._venv_lookup = types.MethodType(venv_lookup, venv)
+# Monkey patch TestenConfig get_envpython to fix tox behavior with tox-conda under windows
+def get_envpython(self):
+    """Override get_envpython to handle windows where the interpreter in at the env root dir."""
+    original_envpython = self.__get_envpython()
+    if original_envpython.exists():
+        return original_envpython
+    if tox.INFO.IS_WIN:
+        return self.envdir.join("python")
+
+
+TestenvConfig.__get_envpython = TestenvConfig.get_envpython
+TestenvConfig.get_envpython = get_envpython
+
+
+# Monkey patch TestenvConfig _venv_lookup to fix tox behavior with tox-conda under windows
+def venv_lookup(self, name):
+    """Override venv_lookup to also look at the env root dir under windows."""
+    paths = [self.envconfig.envbindir]
+    # In Conda environments on Windows, the Python executable is installed in
+    # the top-level environment directory, as opposed to virtualenvs, where it
+    # is installed in the Scripts directory. Tox assumes that looking in the
+    # Scripts directory is sufficient, which is why this workaround is required.
+    if tox.INFO.IS_WIN:
+        paths += [self.envconfig.envdir]
+    return py.path.local.sysfind(name, paths=paths)
+
+
+VirtualEnv._venv_lookup = venv_lookup
