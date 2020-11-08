@@ -1,3 +1,8 @@
+0.4.0 (2020-11-08)
+------------------
+
+- support of conda-spec.txt and conda-env.yml files
+
 0.3.0 (2020-11-08)
 ------------------
 
