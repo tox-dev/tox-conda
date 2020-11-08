@@ -13,6 +13,9 @@ tox-conda
     :target: https://pypi.org/project/tox-conda
     :alt: Python versions
 
+.. image:: https://github.com/tox-dev/tox-conda/workflows/check/badge.svg
+    :target: https://github.com/tox-dev/tox-conda/actions?query=workflow%3Acheck+branch%3Amaster
+    :alt: CI
 
 ``tox-conda`` is a plugin that provides integration with the `conda
 <https://conda.io>`_ package and environment manager for the `tox
