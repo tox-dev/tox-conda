@@ -42,6 +42,13 @@ def get_py_version(envconfig, action):
 
 @hookimpl
 def tox_addoption(parser):
+    parser.add_testenv_attribute(
+        name="conda_env", type="path", help="specify a conda environment.yml file"
+    )
+    parser.add_testenv_attribute(
+        name="conda_spec", type="path", help="specify a conda spec-file.txt file"
+    )
+
     parser.add_testenv_attribute_obj(CondaDepOption())
 
     parser.add_testenv_attribute(
@@ -55,7 +62,15 @@ def tox_configure(config):
     # the conda dependencies when it decides whether an existing environment
     # needs to be updated before being used
     for _, envconfig in config.envconfigs.items():
+        # Make sure the right environment is activated. This works because we're
+        # creating environments using the `-p/--prefix` option in `tox_testenv_create`
+        envconfig.setenv["CONDA_DEFAULT_ENV"] = envconfig.setenv["TOX_ENV_DIR"]
+
         conda_deps = [DepConfig(str(name)) for name in envconfig.conda_deps]
+        # Add the conda-spec.txt file to the end of the conda deps b/c any deps
+        # after --file option(s) are ignored
+        if envconfig.conda_spec:
+            conda_deps.append(DepConfig("--file={}".format(envconfig.conda_spec)))
         envconfig.deps.extend(conda_deps)
 
 
@@ -86,17 +101,23 @@ def tox_testenv_create(venv, action):
     basepath = venv.path.dirpath()
 
     # Check for venv.envconfig.sitepackages and venv.config.alwayscopy here
-
     conda_exe = find_conda(action)
     venv.envconfig.conda_exe = conda_exe
 
     envdir = venv.envconfig.envdir
     python = get_py_version(venv.envconfig, action)
 
-    args = [conda_exe, "create", "--yes", "-p", envdir]
-    for channel in venv.envconfig.conda_channels:
-        args += ["--channel", channel]
-    args += [python]
+    if venv.envconfig.conda_env:
+        # conda env create does not have a --channel argument nor does it take
+        # dependencies specifications (e.g., python=3.8). These must all be specified
+        # in the conda-env.yml file
+        args = [conda_exe, "env", "create", "-p", envdir, "--file", venv.envconfig.conda_env]
+    else:
+        args = [conda_exe, "create", "--yes", "-p", envdir]
+        for channel in venv.envconfig.conda_channels:
+            args += ["--channel", channel]
+        args += [python]
+
     venv._pcall(args, venv=False, action=action, cwd=basepath)
 
     venv.envconfig.conda_python = python
@@ -114,6 +135,10 @@ def install_conda_deps(venv, action, basepath, envdir):
     conda_exe = venv.envconfig.conda_exe
     # Account for the fact that we have a list of DepOptions
     conda_deps = [str(dep.name) for dep in venv.envconfig.conda_deps]
+    # Add the conda-spec.txt file to the end of the conda deps b/c any deps
+    # after --file option(s) are ignored
+    if venv.envconfig.conda_spec:
+        conda_deps.append("--file={}".format(venv.envconfig.conda_spec))
 
     action.setactivity("installcondadeps", ", ".join(conda_deps))
 
@@ -138,6 +163,9 @@ def tox_testenv_install_deps(venv, action):
     saved_deps = copy.deepcopy(venv.envconfig.deps)
 
     num_conda_deps = len(venv.envconfig.conda_deps)
+    if venv.envconfig.conda_spec:
+        num_conda_deps += 1
+
     if num_conda_deps > 0:
         install_conda_deps(venv, action, basepath, envdir)
         # Account for the fact that we added the conda_deps to the deps list in

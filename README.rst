@@ -99,7 +99,7 @@ With the plugin enabled and no other changes, the ``tox-conda`` plugin will use
 ``conda`` to create environments and use ``pip`` to install dependencies that are
 given in the ``tox.ini`` configuration file.
 
-``tox-conda`` adds two additional (and optional) settings to the ``[testenv]``
+``tox-conda`` adds four additional (and optional) settings to the ``[testenv]``
 section of configuration files:
 
 * ``conda_deps``, which is used to configure which dependencies are installed
@@ -110,6 +110,21 @@ section of configuration files:
 * ``conda_channels``, which specifies which channel(s) should be used for
   resolving ``conda`` dependencies. If not given, only the ``default`` channel will
   be used.
+
+* ``conda_spec``, which specifies a ``conda-spec.txt`` file that lists conda
+  dependencies to install and will be combined with ``conda_deps`` (if given). These
+  dependencies can be in a general from (e.g., ``numpy>=1.17.5``) or an explicit
+  form (eg., https://conda.anaconda.org/conda-forge/linux-64/numpy-1.17.5-py38h95a1406_0.tar.bz2),
+  *however*, if the ``@EXPLICIT`` header is in ``conda-spec.txt``, *all* general
+  dependencies will be ignored, including those given in ``conda_deps``.
+
+* ``conda_env``, which specifies a ``conda-env.yml`` file to create a base conda
+  environment for the test. The ``conda-env.yml`` file is self-contained and
+  if the desired python version and conda channels to use is not given, the latest
+  python version (if needed) and default channels will be used. The above ``conda_deps``,
+  ``conda_channels``, and ``conda_spec`` arguments, if used in conjunction with
+  a ``conda-env.yml`` file, will be used to *update* the environment *after* the
+  initial environment creation.
 
 An example configuration file is given below:
 
