@@ -169,7 +169,9 @@ def test_conda_spec(tmpdir, newconfig, mocksession):
             numpy
             astropy
         conda_spec={}
-        """.format(str(txt)),
+        """.format(
+            str(txt)
+        ),
     )
     venv, action, pcalls = create_test_env(config, mocksession, "py123")
 
@@ -212,7 +214,9 @@ def test_conda_env(tmpdir, newconfig, mocksession):
         """
         [testenv:py123]
         conda_env={}
-        """.format(str(yml)),
+        """.format(
+            str(yml)
+        ),
     )
 
     venv = VirtualEnv(config.envconfigs["py123"])
@@ -260,7 +264,9 @@ def test_conda_env_and_spec(tmpdir, newconfig, mocksession):
         [testenv:py123]
         conda_env={}
         conda_spec={}
-        """.format(str(yml), str(txt)),
+        """.format(
+            str(yml), str(txt)
+        ),
     )
     venv, action, pcalls = create_test_env(config, mocksession, "py123")
 

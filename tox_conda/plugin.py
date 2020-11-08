@@ -42,10 +42,10 @@ def get_py_version(envconfig, action):
 
 @hookimpl
 def tox_addoption(parser):
-    parser. add_testenv_attribute(
+    parser.add_testenv_attribute(
         name="conda_env", type="path", help="specify a conda environment.yml file"
     )
-    parser. add_testenv_attribute(
+    parser.add_testenv_attribute(
         name="conda_spec", type="path", help="specify a conda spec-file.txt file"
     )
 
@@ -64,7 +64,7 @@ def tox_configure(config):
     for _, envconfig in config.envconfigs.items():
         # Make sure the right environment is activated. This works because we're
         # creating environments using the `-p/--prefix` option in `tox_testenv_create`
-        envconfig.setenv['CONDA_DEFAULT_ENV'] = envconfig.setenv['TOX_ENV_DIR']
+        envconfig.setenv["CONDA_DEFAULT_ENV"] = envconfig.setenv["TOX_ENV_DIR"]
 
         conda_deps = [DepConfig(str(name)) for name in envconfig.conda_deps]
         # Add the conda-spec.txt file to the end of the conda deps b/c any deps
