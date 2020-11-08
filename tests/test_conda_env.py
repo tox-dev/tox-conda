@@ -187,7 +187,7 @@ def test_conda_spec(tmpdir, newconfig, mocksession):
     assert conda_cmd[1:6] == ["install", "--quiet", "--yes", "-p", venv.path]
     # Make sure that python is explicitly given as part of every conda install
     # in order to avoid inadvertent upgrades of python itself.
-    assert conda_cmd[5].startswith("python=")
+    assert conda_cmd[6].startswith("python=")
     assert conda_cmd[7:9] == ["numpy", "astropy"]
     assert conda_cmd[-1].startswith("--file")
     assert conda_cmd[-1].endswith("conda-spec.txt")
