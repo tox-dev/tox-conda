@@ -17,6 +17,10 @@ tox-conda
     :target: https://github.com/tox-dev/tox-conda/actions?query=workflow%3Acheck+branch%3Amaster
     :alt: CI
 
+.. image:: https://codecov.io/gh/tox-dev/tox-conda/branch/master/graph/badge.svg?token=yYBhrEf4MN
+    :target: https://codecov.io/gh/tox-dev/tox-conda
+    :alt: Code coverage
+
 ``tox-conda`` is a plugin that provides integration with the `conda
 <https://conda.io>`_ package and environment manager for the `tox
 <https://tox.readthedocs.io>`__ automation tool. It's like having your cake and
