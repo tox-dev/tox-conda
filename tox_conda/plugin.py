@@ -1,6 +1,7 @@
 import copy
 import os
 import re
+import shutil
 
 import pluggy
 import py.path
@@ -70,8 +71,9 @@ def find_conda(action):
         return conda_exe
 
     try:
-        action.popen(["conda", "-h"], report_fail=True, returnout=False)
-        return "conda"
+        path = shutil.which("conda")
+        action.popen([path, "-h"], report_fail=True, returnout=False)
+        return path
     except InvocationError:
         pass
 
