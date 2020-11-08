@@ -1,40 +1,59 @@
 repos:
--   repo: https://github.com/ambv/black
-    rev: 19.3b0
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v3.3.0
     hooks:
-    -   id: black
-        args: [--safe]
-        language_version: python3.7
--   repo: https://github.com/asottile/blacken-docs
-    rev: v0.5.0
+      - id: check-ast
+      - id: check-builtin-literals
+      - id: check-docstring-first
+      - id: check-merge-conflict
+      - id: check-yaml
+      - id: check-toml
+      - id: debug-statements
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+  - repo: https://github.com/asottile/pyupgrade
+    rev: v2.7.3
     hooks:
-    -   id: blacken-docs
-        additional_dependencies: [black==19.3b0]
-        language_version: python3.7
--   repo: https://github.com/asottile/seed-isort-config
+      - id: pyupgrade
+        args:
+          - --py3-plus
+  - repo: https://github.com/PyCQA/isort
+    rev: 5.6.4
+    hooks:
+      - id: isort
+  - repo: https://github.com/psf/black
+    rev: 20.8b1
+    hooks:
+      - id: black
+        args:
+          - --safe
+  - repo: https://github.com/PyCQA/flake8
+    rev: 3.8.4
+    hooks:
+      - id: flake8
+        additional_dependencies:
+          - flake8-bugbear == 20.1.4
+  - repo: https://github.com/asottile/setup-cfg-fmt
+    rev: v1.15.1
+    hooks:
+      - id: setup-cfg-fmt
+        args:
+          - --min-py3-version
+          - "3.5"
+  - repo: https://github.com/tox-dev/tox-ini-fmt
+    rev: 0.5.0
+    hooks:
+      - id: tox-ini-fmt
+        args:
+          - -p
+          - fix
+  - repo: https://github.com/asottile/blacken-docs
+    rev: v1.8.0
+    hooks:
+      - id: blacken-docs
+        additional_dependencies:
+          - black==20.8b1
+  - repo: https://github.com/pre-commit/pygrep-hooks
     rev: v1.7.0
     hooks:
-    -   id: seed-isort-config
-        args: [--application-directories, "src:."]
--   repo: https://github.com/pre-commit/mirrors-isort
-    rev: v4.3.15
-    hooks:
-    -   id: isort
--   repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v2.1.0
-    hooks:
-    -   id: trailing-whitespace
-    -   id: end-of-file-fixer
-    -   id: check-yaml
-    -   id: debug-statements
-    -   id: flake8
-        additional_dependencies: ["flake8-bugbear == 18.8.0"]
-        language_version: python3.7
--   repo: https://github.com/asottile/pyupgrade
-    rev: v1.12.0
-    hooks:
-    -   id: pyupgrade
--   repo: https://github.com/pre-commit/pygrep-hooks
-    rev: v1.2.0
-    hooks:
-    -   id: rst-backticks
+      - id: rst-backticks

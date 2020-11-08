@@ -4,7 +4,6 @@ import re
 
 import pluggy
 import py.path
-
 import tox
 from tox.config import DepConfig, DepOption, TestenvConfig
 from tox.exception import InvocationError

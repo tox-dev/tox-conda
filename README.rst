@@ -13,13 +13,6 @@ tox-conda
     :target: https://pypi.org/project/tox-conda
     :alt: Python versions
 
-.. image:: https://travis-ci.org/tox-dev/tox-conda.svg?branch=master
-    :target: https://travis-ci.org/tox-dev/tox-conda
-    :alt: See Build Status on Travis CI
-
-.. image:: https://ci.appveyor.com/api/projects/status/github/tox-dev/tox-conda?branch=master
-    :target: https://ci.appveyor.com/project/tox-dev/tox-conda/branch/master
-    :alt: See Build Status on AppVeyor
 
 ``tox-conda`` is a plugin that provides integration with the `conda
 <https://conda.io>`_ package and environment manager for the `tox
