@@ -89,11 +89,11 @@ def test_install_conda_deps(newconfig, mocksession):
     call = pcalls[-2]
     conda_cmd = call.args
     assert "conda" in os.path.split(conda_cmd[0])[-1]
-    assert conda_cmd[1:5] == ["install", "--yes", "-p", venv.path]
+    assert conda_cmd[1:6] == ["install", "--quiet", "--yes", "-p", venv.path]
     # Make sure that python is explicitly given as part of every conda install
     # in order to avoid inadvertant upgrades of python itself.
-    assert conda_cmd[5].startswith("python=")
-    assert conda_cmd[6:8] == ["pytest", "asdf"]
+    assert conda_cmd[6].startswith("python=")
+    assert conda_cmd[7:9] == ["pytest", "asdf"]
 
     pip_cmd = pcalls[-1].args
     assert pip_cmd[1:4] == ["-m", "pip", "install"]
@@ -124,7 +124,7 @@ def test_install_conda_no_pip(newconfig, mocksession):
     call = pcalls[-1]
     conda_cmd = call.args
     assert "conda" in os.path.split(conda_cmd[0])[-1]
-    assert conda_cmd[1:5] == ["install", "--yes", "-p", venv.path]
+    assert conda_cmd[1:6] == ["install", "--quiet", "--yes", "-p", venv.path]
 
 
 def test_update(tmpdir, newconfig, mocksession):
