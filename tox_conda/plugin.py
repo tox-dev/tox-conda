@@ -182,11 +182,12 @@ def tox_testenv_install_deps(venv, action):
 
 @hookimpl
 def tox_get_python_executable(envconfig):
-    conda_python_path = os.path.join(str(envconfig.envdir), "python.exe")
-    if os.path.exists(conda_python_path):
-        return conda_python_path
+    if tox.INFO.IS_WIN:
+        path = envconfig.envdir.join("python.exe")
     else:
-        return None
+        path = envconfig.envdir.join("bin", "python")
+    if path.exists():
+        return path
 
 
 # Monkey patch TestenConfig get_envpython to fix tox behavior with tox-conda under windows
