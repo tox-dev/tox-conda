@@ -1,3 +1,8 @@
+0.4.1 (2020-11-10)
+------------------
+
+- Fix: Environments always recreated, except for version matching env interpreter
+
 0.4.0 (2020-11-08)
 ------------------
 
