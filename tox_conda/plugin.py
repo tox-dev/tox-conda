@@ -20,12 +20,14 @@ class CondaDepOption(DepOption):
 
 def get_py_version(envconfig, action):
     # Try to use basepython
-    match = re.match(r"python(\d)(?:\.(\d))?", envconfig.basepython)
+    match = re.match(r"python(\d)(?:\.(\d))?(?:\.(\d))?", envconfig.basepython)
     if match:
         groups = match.groups()
         version = groups[0]
         if groups[1]:
             version += ".{}".format(groups[1])
+        if groups[2]:
+            version += ".{}".format(groups[2])
 
     # First fallback
     elif envconfig.python_info.version_info:
