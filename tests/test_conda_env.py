@@ -299,3 +299,25 @@ def test_conda_env_and_spec(tmpdir, newconfig, mocksession):
     assert conda_cmd[6].startswith("python=")
     assert conda_cmd[-1].startswith("--file")
     assert conda_cmd[-1].endswith("conda-spec.txt")
+
+
+def test_conda_install_args(newconfig, mocksession):
+    config = newconfig(
+        [],
+        """
+        [testenv:py123]
+        conda_deps=
+            numpy
+        conda_install_args=
+            --override-channels
+    """,
+    )
+
+    venv, action, pcalls = create_test_env(config, mocksession, "py123")
+
+    assert len(venv.envconfig.conda_install_args) == 1
+
+    tox_testenv_install_deps(action=action, venv=venv)
+
+    call = pcalls[-1]
+    assert call.args[6] == "--override-channels"
