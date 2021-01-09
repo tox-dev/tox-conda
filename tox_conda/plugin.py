@@ -57,6 +57,12 @@ def tox_addoption(parser):
         name="conda_channels", type="line-list", help="each line specifies a conda channel"
     )
 
+    parser.add_testenv_attribute(
+        name="conda_install_args",
+        type="line-list",
+        help="each line specifies a conda install argument",
+    )
+
 
 @hookimpl
 def tox_configure(config):
@@ -148,6 +154,10 @@ def install_conda_deps(venv, action, basepath, envdir):
     args = [conda_exe, "install", "--quiet", "--yes", "-p", envdir]
     for channel in venv.envconfig.conda_channels:
         args += ["--channel", channel]
+
+    # Add end-user conda install args
+    args += venv.envconfig.conda_install_args
+
     # We include the python version in the conda requirements in order to make
     # sure that none of the other conda requirements inadvertently downgrade
     # python in this environment. If any of the requirements are in conflict
