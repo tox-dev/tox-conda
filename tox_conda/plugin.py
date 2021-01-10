@@ -63,6 +63,12 @@ def tox_addoption(parser):
         help="each line specifies a conda install argument",
     )
 
+    parser.add_testenv_attribute(
+        name="conda_create_args",
+        type="line-list",
+        help="each line specifies a conda create argument",
+    )
+
 
 @hookimpl
 def tox_configure(config):
@@ -124,6 +130,10 @@ def tox_testenv_create(venv, action):
         args = [conda_exe, "create", "--yes", "-p", envdir]
         for channel in venv.envconfig.conda_channels:
             args += ["--channel", channel]
+
+        # Add end-user conda create args
+        args += venv.envconfig.conda_create_args
+
         args += [python]
 
     venv._pcall(args, venv=False, action=action, cwd=basepath)
