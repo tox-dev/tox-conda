@@ -126,6 +126,11 @@ section of configuration files:
   a ``conda-env.yml`` file, will be used to *update* the environment *after* the
   initial environment creation.
 
+* ``conda_create_args``, which is used to pass arguments to the command ``conda create``.
+  The passed arguments are inserted in the command line before the python package.
+  For instance, passing ``--override-channels`` will create more reproducible environments
+  because the channels defined in the users ``.condarc`` will not interfer.
+
 * ``conda_install_args``, which is used to pass arguments to the command ``conda install``.
   The passed arguments are inserted in the command line before the dependencies.
   For instance, passing ``--override-channels`` will create more reproducible environments

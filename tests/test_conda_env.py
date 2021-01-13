@@ -321,3 +321,30 @@ def test_conda_install_args(newconfig, mocksession):
 
     call = pcalls[-1]
     assert call.args[6] == "--override-channels"
+
+
+def test_conda_create_args(newconfig, mocksession):
+    config = newconfig(
+        [],
+        """
+        [testenv:py123]
+        conda_create_args=
+            --override-channels
+    """,
+    )
+
+    venv = VirtualEnv(config.envconfigs["py123"])
+    assert venv.path == config.envconfigs["py123"].envdir
+
+    with mocksession.newaction(venv.name, "getenv") as action:
+        tox_testenv_create(action=action, venv=venv)
+    pcalls = mocksession._pcalls
+    assert len(pcalls) >= 1
+    call = pcalls[-1]
+    assert "conda" in call.args[0]
+    assert "create" == call.args[1]
+    assert "--yes" == call.args[2]
+    assert "-p" == call.args[3]
+    assert venv.path == call.args[4]
+    assert call.args[5] == "--override-channels"
+    assert call.args[6].startswith("python=")
