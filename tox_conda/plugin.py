@@ -18,6 +18,12 @@ class CondaDepOption(DepOption):
     help = "each line specifies a conda dependency in pip/setuptools format"
 
 
+def postprocess_path_option(testenv_config, value):
+    if value == testenv_config.config.toxinidir:
+        return None
+    return value
+
+
 def get_py_version(envconfig, action):
     # Try to use basepython
     match = re.match(r"python(\d)(?:\.(\d))?(?:\.?(\d))?", envconfig.basepython)
@@ -45,10 +51,16 @@ def get_py_version(envconfig, action):
 @hookimpl
 def tox_addoption(parser):
     parser.add_testenv_attribute(
-        name="conda_env", type="path", help="specify a conda environment.yml file"
+        name="conda_env",
+        type="path",
+        help="specify a conda environment.yml file",
+        postprocess=postprocess_path_option,
     )
     parser.add_testenv_attribute(
-        name="conda_spec", type="path", help="specify a conda spec-file.txt file"
+        name="conda_spec",
+        type="path",
+        help="specify a conda spec-file.txt file",
+        postprocess=postprocess_path_option,
     )
 
     parser.add_testenv_attribute_obj(CondaDepOption())
@@ -83,7 +95,7 @@ def tox_configure(config):
         conda_deps = [DepConfig(str(name)) for name in envconfig.conda_deps]
         # Add the conda-spec.txt file to the end of the conda deps b/c any deps
         # after --file option(s) are ignored
-        if envconfig.conda_spec:
+        if envconfig.conda_spec is not None:
             conda_deps.append(DepConfig("--file={}".format(envconfig.conda_spec)))
         envconfig.deps.extend(conda_deps)
 
@@ -121,7 +133,7 @@ def tox_testenv_create(venv, action):
     envdir = venv.envconfig.envdir
     python = get_py_version(venv.envconfig, action)
 
-    if venv.envconfig.conda_env:
+    if venv.envconfig.conda_env is not None:
         # conda env create does not have a --channel argument nor does it take
         # dependencies specifications (e.g., python=3.8). These must all be specified
         # in the conda-env.yml file
@@ -158,7 +170,7 @@ def install_conda_deps(venv, action, basepath, envdir):
     conda_deps = [str(dep.name) for dep in venv.envconfig.conda_deps]
     # Add the conda-spec.txt file to the end of the conda deps b/c any deps
     # after --file option(s) are ignored
-    if venv.envconfig.conda_spec:
+    if venv.envconfig.conda_spec is not None:
         conda_deps.append("--file={}".format(venv.envconfig.conda_spec))
 
     action.setactivity("installcondadeps", ", ".join(conda_deps))
@@ -188,7 +200,7 @@ def tox_testenv_install_deps(venv, action):
     saved_deps = copy.deepcopy(venv.envconfig.deps)
 
     num_conda_deps = len(venv.envconfig.conda_deps)
-    if venv.envconfig.conda_spec:
+    if venv.envconfig.conda_spec is not None:
         num_conda_deps += 1
 
     if num_conda_deps > 0:

@@ -193,6 +193,30 @@ def test_conda_spec(tmpdir, newconfig, mocksession):
     assert conda_cmd[-1].endswith("conda-spec.txt")
 
 
+def test_empty_conda_spec_and_env(tmpdir, newconfig, mocksession):
+    """Test environment creation when empty conda_spec and conda_env."""
+    txt = tmpdir.join("conda-spec.txt")
+    txt.write(
+        """
+        pytest
+        """
+    )
+    config = newconfig(
+        [],
+        """
+        [testenv:py123]
+        conda_env=
+          foo: path-to.yml
+        conda_spec=
+          foo: path-to.yml
+        """,
+    )
+    venv, _, _ = create_test_env(config, mocksession, "py123")
+
+    assert venv.envconfig.conda_spec is None
+    assert venv.envconfig.conda_env is None
+
+
 def test_conda_env(tmpdir, newconfig, mocksession):
     """Test environment creation when conda_env given"""
     yml = tmpdir.join("conda-env.yml")
