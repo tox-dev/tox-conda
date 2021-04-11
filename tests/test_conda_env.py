@@ -62,7 +62,7 @@ def test_install_deps_no_conda(newconfig, mocksession):
     assert len(pcalls) >= 1
     call = pcalls[-1]
     cmd = call.args
-    assert cmd[1:4] == ["-m", "pip", "install"]
+    assert cmd[6:9] == ["-m", "pip", "install"]
 
 
 def test_install_conda_deps(newconfig, mocksession):
@@ -97,8 +97,8 @@ def test_install_conda_deps(newconfig, mocksession):
     assert conda_cmd[7:9] == ["pytest", "asdf"]
 
     pip_cmd = pcalls[-1].args
-    assert pip_cmd[1:4] == ["-m", "pip", "install"]
-    assert pip_cmd[4:6] == ["numpy", "astropy"]
+    assert pip_cmd[6:9] == ["-m", "pip", "install"]
+    assert pip_cmd[9:11] == ["numpy", "astropy"]
 
 
 def test_install_conda_no_pip(newconfig, mocksession):

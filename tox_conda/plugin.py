@@ -48,6 +48,27 @@ def get_py_version(envconfig, action):
     return "python={}".format(version)
 
 
+class CondaRunWrapper:
+    """A functor that execute a command via conda run.
+
+    It wraps popen so the command is executed in the context of an activated env.
+    """
+
+    CONDA_RUN_CMD_PREFIX = "{conda_exe} run --no-capture-output -p {envdir}"
+
+    def __init__(self, venv, popen):
+        self.__envdir = venv.envconfig.envdir
+        self.__conda_exe = venv.envconfig.conda_exe
+        self.__popen = popen
+
+    def __call__(self, cmd_args, **kwargs):
+        conda_run_cmd_prefix = self.CONDA_RUN_CMD_PREFIX.format(
+            conda_exe=self.__conda_exe, envdir=self.__envdir
+        )
+        cmd_args = conda_run_cmd_prefix.split() + cmd_args
+        return self.__popen(cmd_args, **kwargs)
+
+
 @hookimpl
 def tox_addoption(parser):
     parser.add_testenv_attribute(
@@ -87,7 +108,7 @@ def tox_configure(config):
     # This is a pretty cheesy workaround. It allows tox to consider changes to
     # the conda dependencies when it decides whether an existing environment
     # needs to be updated before being used
-    for _, envconfig in config.envconfigs.items():
+    for envconfig in config.envconfigs.values():
         # Make sure the right environment is activated. This works because we're
         # creating environments using the `-p/--prefix` option in `tox_testenv_create`
         envconfig.setenv["CONDA_DEFAULT_ENV"] = envconfig.setenv["TOX_ENV_DIR"]
@@ -161,6 +182,9 @@ def tox_testenv_create(venv, action):
         pass
     venv.envconfig.config.interpreters.get_executable(venv.envconfig)
 
+    # this will force commands and commands_{pre,post} to be executed via conda run
+    venv.popen = CondaRunWrapper(venv, venv.popen)
+
     return True
 
 
@@ -210,8 +234,10 @@ def tox_testenv_install_deps(venv, action):
         # to be present when we call pip install
         venv.envconfig.deps = venv.envconfig.deps[: -1 * num_conda_deps]
 
-    # Install dependencies from pypi here
+    # Install dependencies from pypi via conda run
+    action.via_popen = CondaRunWrapper(venv, action.via_popen)
     tox.venv.tox_testenv_install_deps(venv=venv, action=action)
+
     # Restore for the config file
     venv.envconfig.deps = saved_deps
     return True
