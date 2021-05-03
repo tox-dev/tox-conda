@@ -12,7 +12,7 @@ repos:
       - id: end-of-file-fixer
       - id: trailing-whitespace
   - repo: https://github.com/asottile/pyupgrade
-    rev: v2.12.0
+    rev: v2.14.0
     hooks:
       - id: pyupgrade
         args:
@@ -22,13 +22,13 @@ repos:
     hooks:
       - id: isort
   - repo: https://github.com/psf/black
-    rev: 20.8b1
+    rev: 21.4b2
     hooks:
       - id: black
         args:
           - --safe
   - repo: https://github.com/PyCQA/flake8
-    rev: 3.9.0
+    rev: 3.9.1
     hooks:
       - id: flake8
         additional_dependencies:
