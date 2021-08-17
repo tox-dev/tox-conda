@@ -2,12 +2,14 @@ import copy
 import os
 import re
 import shutil
+import subprocess
+import tempfile
+from contextlib import contextmanager
 
 import pluggy
 import py.path
 import tox
 from tox.config import DepConfig, DepOption, TestenvConfig
-from tox.exception import InvocationError
 from tox.venv import VirtualEnv
 
 hookimpl = pluggy.HookimplMarker("tox")
@@ -57,16 +59,33 @@ class CondaRunWrapper:
     CONDA_RUN_CMD_PREFIX = "{conda_exe} run --no-capture-output -p {envdir}"
 
     def __init__(self, venv, popen):
-        self.__envdir = venv.envconfig.envdir
-        self.__conda_exe = venv.envconfig.conda_exe
+        self.__venv = venv
         self.__popen = popen
 
     def __call__(self, cmd_args, **kwargs):
         conda_run_cmd_prefix = self.CONDA_RUN_CMD_PREFIX.format(
-            conda_exe=self.__conda_exe, envdir=self.__envdir
+            conda_exe=self.__venv.envconfig.conda_exe, envdir=self.__venv.envconfig.envdir
         )
         cmd_args = conda_run_cmd_prefix.split() + cmd_args
         return self.__popen(cmd_args, **kwargs)
+
+
+@contextmanager
+def conda_run(venv, action=None):
+    """Run a command via conda run."""
+    if action is None:
+        initial_popen = venv.popen
+        venv.popen = CondaRunWrapper(venv, initial_popen)
+    else:
+        initial_popen = action.via_popen
+        action.via_popen = CondaRunWrapper(venv, initial_popen)
+
+    yield
+
+    if action is None:
+        venv.popen = initial_popen
+    else:
+        action.via_popen = initial_popen
 
 
 @hookimpl
@@ -107,7 +126,12 @@ def tox_addoption(parser):
 def tox_configure(config):
     # This is a pretty cheesy workaround. It allows tox to consider changes to
     # the conda dependencies when it decides whether an existing environment
-    # needs to be updated before being used
+    # needs to be updated before being used.
+
+    # Set path to the conda executable because it cannot be determined once
+    # an env has already been created.
+    conda_exe = find_conda()
+
     for envconfig in config.envconfigs.values():
         # Make sure the right environment is activated. This works because we're
         # creating environments using the `-p/--prefix` option in `tox_testenv_create`
@@ -120,8 +144,10 @@ def tox_configure(config):
             conda_deps.append(DepConfig("--file={}".format(envconfig.conda_spec)))
         envconfig.deps.extend(conda_deps)
 
+        envconfig.conda_exe = conda_exe
 
-def find_conda(action):
+
+def find_conda():
     # This should work if we're not already in an environment
     conda_exe = os.environ.get("_CONDA_EXE")
     if conda_exe:
@@ -132,14 +158,14 @@ def find_conda(action):
     if conda_exe:
         return conda_exe
 
-    try:
-        path = shutil.which("conda")
-        action.popen([path, "-h"], report_fail=True, returnout=False)
-        return path
-    except InvocationError:
-        pass
+    path = shutil.which("conda")
 
-    raise RuntimeError("Can't locate conda executable")
+    try:
+        subprocess.check_call([str(path), "-h"])
+    except subprocess.CalledProcessError:
+        raise RuntimeError("Can't locate conda executable")
+
+    return path
 
 
 @hookimpl
@@ -148,9 +174,6 @@ def tox_testenv_create(venv, action):
     basepath = venv.path.dirpath()
 
     # Check for venv.envconfig.sitepackages and venv.config.alwayscopy here
-    conda_exe = find_conda(action)
-    venv.envconfig.conda_exe = conda_exe
-
     envdir = venv.envconfig.envdir
     python = get_py_version(venv.envconfig, action)
 
@@ -158,9 +181,17 @@ def tox_testenv_create(venv, action):
         # conda env create does not have a --channel argument nor does it take
         # dependencies specifications (e.g., python=3.8). These must all be specified
         # in the conda-env.yml file
-        args = [conda_exe, "env", "create", "-p", envdir, "--file", venv.envconfig.conda_env]
+        args = [
+            venv.envconfig.conda_exe,
+            "env",
+            "create",
+            "-p",
+            envdir,
+            "--file",
+            venv.envconfig.conda_env,
+        ]
     else:
-        args = [conda_exe, "create", "--yes", "-p", envdir]
+        args = [venv.envconfig.conda_exe, "create", "--yes", "-p", envdir]
         for channel in venv.envconfig.conda_channels:
             args += ["--channel", channel]
 
@@ -180,16 +211,13 @@ def tox_testenv_create(venv, action):
         del venv.envconfig.config.interpreters.name2executable[venv.name]
     except KeyError:
         pass
-    venv.envconfig.config.interpreters.get_executable(venv.envconfig)
 
-    # this will force commands and commands_{pre,post} to be executed via conda run
-    venv.popen = CondaRunWrapper(venv, venv.popen)
+    venv.envconfig.config.interpreters.get_executable(venv.envconfig)
 
     return True
 
 
 def install_conda_deps(venv, action, basepath, envdir):
-    conda_exe = venv.envconfig.conda_exe
     # Account for the fact that we have a list of DepOptions
     conda_deps = [str(dep.name) for dep in venv.envconfig.conda_deps]
     # Add the conda-spec.txt file to the end of the conda deps b/c any deps
@@ -200,7 +228,7 @@ def install_conda_deps(venv, action, basepath, envdir):
     action.setactivity("installcondadeps", ", ".join(conda_deps))
 
     # Install quietly to make the log cleaner
-    args = [conda_exe, "install", "--quiet", "--yes", "-p", envdir]
+    args = [venv.envconfig.conda_exe, "install", "--quiet", "--yes", "-p", envdir]
     for channel in venv.envconfig.conda_channels:
         args += ["--channel", channel]
 
@@ -218,9 +246,7 @@ def install_conda_deps(venv, action, basepath, envdir):
 
 @hookimpl
 def tox_testenv_install_deps(venv, action):
-    basepath = venv.path.dirpath()
-    envdir = venv.envconfig.envdir
-    # Save for later : we will need it for the config file
+    # Save the deps before we make temporary changes.
     saved_deps = copy.deepcopy(venv.envconfig.deps)
 
     num_conda_deps = len(venv.envconfig.conda_deps)
@@ -228,18 +254,29 @@ def tox_testenv_install_deps(venv, action):
         num_conda_deps += 1
 
     if num_conda_deps > 0:
-        install_conda_deps(venv, action, basepath, envdir)
+        install_conda_deps(venv, action, venv.path.dirpath(), venv.envconfig.envdir)
         # Account for the fact that we added the conda_deps to the deps list in
         # tox_configure (see comment there for rationale). We don't want them
-        # to be present when we call pip install
+        # to be present when we call pip install.
         venv.envconfig.deps = venv.envconfig.deps[: -1 * num_conda_deps]
 
-    # Install dependencies from pypi via conda run
-    action.via_popen = CondaRunWrapper(venv, action.via_popen)
-    tox.venv.tox_testenv_install_deps(venv=venv, action=action)
+    if venv.envconfig.deps:
+        # Dump the pypi deps to a requirements file because, as of conda 4.10.1,
+        # the conda run command cannot parse a pip command with conditions on
+        # the dependencies.
+        _, temp_req_filename = tempfile.mkstemp()
+        with open(temp_req_filename, "w") as stream:
+            lines = ["{}\n".format(dep) for dep in venv.envconfig.deps]
+            stream.writelines(lines)
 
-    # Restore for the config file
+        venv.envconfig.deps = [tox.config.DepConfig("-r{}".format(temp_req_filename))]
+
+    with conda_run(venv, action):
+        tox.venv.tox_testenv_install_deps(venv=venv, action=action)
+
+    # Restore the deps.
     venv.envconfig.deps = saved_deps
+
     return True
 
 
@@ -281,3 +318,22 @@ def venv_lookup(self, name):
 
 
 VirtualEnv._venv_lookup = venv_lookup
+
+
+@hookimpl(hookwrapper=True)
+def tox_runtest_pre(venv):
+    with conda_run(venv):
+        yield
+
+
+@hookimpl
+def tox_runtest(venv, redirect):
+    with conda_run(venv):
+        tox.venv.tox_runtest(venv, redirect)
+    return True
+
+
+@hookimpl(hookwrapper=True)
+def tox_runtest_post(venv):
+    with conda_run(venv):
+        yield
