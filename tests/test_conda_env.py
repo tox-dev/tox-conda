@@ -98,7 +98,11 @@ def test_install_conda_deps(newconfig, mocksession):
 
     pip_cmd = pcalls[-1].args
     assert pip_cmd[6:9] == ["-m", "pip", "install"]
-    assert pip_cmd[9:11] == ["numpy", "astropy"]
+
+    # Get the deps from the requirements file.
+    with open(pip_cmd[9][2:]) as stream:
+        deps = [line.strip() for line in stream.readlines()]
+    assert deps == ["numpy", "astropy"]
 
 
 def test_install_conda_no_pip(newconfig, mocksession):
