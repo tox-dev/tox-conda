@@ -49,6 +49,14 @@ def test_conda_run_command(cmd, initproj):
             )
         },
     )
+
+    result = cmd("-v", "-e", env_name)
+    result.assert_success()
+
+    for filename in ("commands_pre", "commands_post", "commands"):
+        assert open(filename).read().endswith(env_name)
+
+    # Run once again when the env creation hooks are not called.
     result = cmd("-v", "-e", env_name)
     result.assert_success()
 
