@@ -41,6 +41,7 @@ def test_conda_run_command(cmd, initproj):
                 [tox]
                 skipsdist=True
                 [testenv:{}]
+                deps = pip>0,<999
                 commands_pre = python -c "import os; open('commands_pre', 'w').write(os.environ['CONDA_PREFIX'])"
                 commands = python -c "import os; open('commands', 'w').write(os.environ['CONDA_PREFIX'])"
                 commands_post = python -c "import os; open('commands_post', 'w').write(os.environ['CONDA_PREFIX'])"
@@ -49,6 +50,14 @@ def test_conda_run_command(cmd, initproj):
             )
         },
     )
+
+    result = cmd("-v", "-e", env_name)
+    result.assert_success()
+
+    for filename in ("commands_pre", "commands_post", "commands"):
+        assert open(filename).read().endswith(env_name)
+
+    # Run once again when the env creation hooks are not called.
     result = cmd("-v", "-e", env_name)
     result.assert_success()
 
