@@ -1,5 +1,6 @@
+/magic
 .idea
-*.egg-info/
+*.egg-info
 .tox/
 .coverage*
 coverage.xml
