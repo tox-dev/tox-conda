@@ -62,9 +62,7 @@ class CondaRunWrapper:
         self.__popen = popen
 
     def __call__(self, cmd_args, **kwargs):
-        conda_run_cmd_prefix = self.CONDA_RUN_CMD_PREFIX.format(
-            conda_exe=self.__conda_exe, envdir=self.__envdir
-        )
+        conda_run_cmd_prefix = self.CONDA_RUN_CMD_PREFIX.format(conda_exe=self.__conda_exe, envdir=self.__envdir)
         cmd_args = conda_run_cmd_prefix.split() + cmd_args
         return self.__popen(cmd_args, **kwargs)
 
@@ -86,9 +84,7 @@ def tox_addoption(parser):
 
     parser.add_testenv_attribute_obj(CondaDepOption())
 
-    parser.add_testenv_attribute(
-        name="conda_channels", type="line-list", help="each line specifies a conda channel"
-    )
+    parser.add_testenv_attribute(name="conda_channels", type="line-list", help="each line specifies a conda channel")
 
     parser.add_testenv_attribute(
         name="conda_install_args",

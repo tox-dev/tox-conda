@@ -1,35 +1,11 @@
-# python
-*.pyc
-*.pyo
-*.swp
+.idea
+*.egg-info/
+.tox/
+.coverage*
+coverage.xml
+.*_cache
 __pycache__
-.eggs
-
-
-# packaging folders
-tox_conda/version.py
-/build/
-/dist/
-/tox_conda.egg-info
-
-# tox working folder
-/.tox
-
-# IDEs
-/.idea
-/.vscode
-
-# tools
-/.*_cache
-.dmypy.json
-
-# documentation
-/docs/_draft.rst
-
-# release
-credentials.json
-
-pip-wheel-metadata
-.DS_Store
-.coverage.*
-Dockerfile
+**.pyc
+build
+dist
+src/tox_conda/version.py
