@@ -1,18 +1,18 @@
 [build-system]
 requires = [
-    "setuptools >= 44",
-    "wheel >= 0.30",
-    "setuptools_scm[toml]>=3.4",
+    "setuptools >= 57",
+    "wheel >= 0.37",
+    "setuptools_scm[toml]>=6",
 ]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools_scm]
-write_to = "tox_conda/version.py"
+write_to = "src/tox_conda/version.py"
 
 [tool.black]
-line-length = 99
+line-length = 120
 
 [tool.isort]
-line_length = 99
+line_length = 120
 profile = "black"
 known_first_party = ["tox_conda"]
