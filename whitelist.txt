@@ -24,6 +24,7 @@ sysconfig
 textwrap
 tox
 ttl
+usefixtures
 util
 ver
 virtualenv

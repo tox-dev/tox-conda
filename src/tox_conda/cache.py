@@ -25,7 +25,7 @@ class Cache:
         self._path.parent.mkdir(parents=True, exist_ok=True)
         self._path.write_text(json.dumps(self._content, indent=2))
 
-    def get_ttl_value(self, section: str, sub_section: Optional[str] = None) -> Optional[Any]:
+    def get_ttl_value(self, section: str, sub_section: Optional[str] = None, version: int = 1) -> Optional[Any]:
         if section in self._content:
             value = self._content[section]
             if sub_section is not None:
@@ -37,12 +37,14 @@ class Cache:
             value = None
         if value is not None:
             until = datetime.fromisoformat(value["until"])
-            if datetime.now() < until:
+            if datetime.now() < until and value.get("version", 0) == version:
                 return value["value"]
         return None
 
-    def set_ttl_value(self, value: object, ttl: timedelta, section: str, sub_section: Optional[str] = None) -> None:
-        content = {"until": (datetime.now() + ttl).isoformat(), "value": value}
+    def set_ttl_value(
+        self, value: object, version: int, ttl: timedelta, section: str, sub_section: Optional[str] = None
+    ) -> None:
+        content = {"version": version, "until": (datetime.now() + ttl).isoformat(), "value": value}
         if sub_section is None:
             self._content[section] = content
         else:

@@ -5,7 +5,7 @@ import sys
 from abc import ABC
 from datetime import timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, Dict, List, Optional, Union, cast
 
 from tox.execute.api import Execute
 from tox.execute.local_sub_process import LocalSubProcessExecutor
@@ -18,6 +18,11 @@ from virtualenv.discovery.py_spec import PythonSpec
 from .cache import Cache
 from .installer import CondaInstaller
 from .util import conda_exe
+
+if sys.version_info >= (3, 8):
+    from typing import TypedDict
+else:
+    from typing_extensions import TypedDict
 
 
 class Conda(Python, ABC):
@@ -76,12 +81,12 @@ class Conda(Python, ABC):
 
     @property
     def conda_info(self) -> Dict[str, Any]:
-        cached_value: Optional[Dict[str, Any]] = self._app_cache.get_ttl_value("conda", "info")
+        cached_value: Optional[Dict[str, Any]] = self._app_cache.get_ttl_value("conda", "info", 1)
         if cached_value is None:
             cmd = ["conda", "info", "--json"]
             result = self.execute(cmd, stdin=StdinSource.OFF, show=False, run_id="conda-info")
             cached_value = json.loads(result.out)
-            self._app_cache.set_ttl_value(cached_value, timedelta(days=1), "info")
+            self._app_cache.set_ttl_value(cached_value, 1, timedelta(days=1), "info")
         return cached_value
 
     def _get_python(self, base_python: List[str]) -> Optional[PythonInfo]:  # noqa: U100
@@ -146,14 +151,14 @@ class Conda(Python, ABC):
         return None
 
     def available_cpython(self) -> List[str]:
-        cached_value: Optional[List[str]] = self._app_cache.get_ttl_value("python", "versions")
+        cached_value: Optional[List[str]] = self._app_cache.get_ttl_value("python", "versions", 1)
         if cached_value is None:
             # handle architecture via passing --subdir linux-32 linux-64 etc ?
             cmd = ["conda", "search", "python", "-f", "--json"]
             result = self.execute(cmd, stdin=StdinSource.OFF, show=False, run_id="python-versions")
             response = json.loads(result.out)
             cached_value = sorted({r["version"] for r in response["python"]}, reverse=True)
-            self._app_cache.set_ttl_value(cached_value, timedelta(days=1), "python", "versions")
+            self._app_cache.set_ttl_value(cached_value, 1, timedelta(days=1), "python", "versions")
         return cached_value
 
     def create_python_env(self) -> None:
@@ -184,36 +189,38 @@ class Conda(Python, ABC):
 
     def prepend_env_var_path(self) -> List[Path]:
         """Paths to add to the executable"""
-        return [self.env_bin_dir()]
+        return [self.env_bin_dir(), self.env_python().parent]
 
     def env_site_package_dir(self) -> Path:
         return Path(self.get_sysconfig(schema="purelib"))
 
     def env_python(self) -> Path:
-        return self.env_bin_dir() / f"python{'.exe' if sys.platform == 'win32' else ''}"
+        return Path(self.sysconfig_info["exe"].format(prefix=self.env_dir))
 
     def env_bin_dir(self) -> Path:
         return Path(self.get_sysconfig(schema="scripts"))
 
     @property
-    def sysconfig_info(self) -> Dict[str, Dict[str, str]]:
+    def sysconfig_info(self) -> "SysConfigInfo":
         key = f"schema-{self.base_python.implementation}-{self.base_python.version}"
-        cached_value = cast(Dict[str, Dict[str, str]], self._app_cache.get_ttl_value("python", key))
+        cached_value = cast(Optional[SysConfigInfo], self._app_cache.get_ttl_value("python", key, 1))
         if cached_value is None:
             self.ensure_python_env()  # ensure the python environment exists
             sub_cmd = (
-                "import sysconfig; import json;"
-                "print(json.dumps({'vars': sysconfig.get_config_vars(), 'schema': sysconfig.get_paths(expand=False)}))"
+                "import sysconfig; import json; import sys;"
+                "print(json.dumps({'vars': sysconfig.get_config_vars(), 'schema': sysconfig.get_paths(expand=False), "
+                "'exe': sys.executable}))"
             )
             prefix = str(self.env_dir)
             cmd = ["conda", "run", "--prefix", prefix, "python", "-c", sub_cmd]
             result = self.execute(cmd, stdin=StdinSource.OFF, show=False, run_id=key)
             result.assert_success()
-            cached_value = json.loads(result.out)
+            cached_value = cast(SysConfigInfo, json.loads(result.out))
             cached_value["vars"] = {
                 k: v.replace(prefix, "{prefix}") if isinstance(v, str) else v for k, v in cached_value["vars"].items()
             }
-            self._app_cache.set_ttl_value(cached_value, timedelta(days=1), "python", key)
+            cached_value["exe"] = cached_value["exe"].replace(prefix, "{prefix}")
+            self._app_cache.set_ttl_value(cached_value, 1, timedelta(days=1), "python", key)
         return cached_value
 
     def get_sysconfig(self, schema: str) -> str:
@@ -222,6 +229,12 @@ class Conda(Python, ABC):
         template = sys_info["schema"][schema]
         result = template.format(**variables)
         return result
+
+
+class SysConfigInfo(TypedDict):
+    schema: Dict[str, str]
+    vars: Dict[str, Union[str, int]]
+    exe: str
 
 
 __all__ = [

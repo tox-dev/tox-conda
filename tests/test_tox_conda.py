@@ -21,6 +21,7 @@ def test_no_conda(tox_project: ToxProjectCreator, mocker: MockFixture) -> None:
 
 
 @pytest.mark.integration()
+@pytest.mark.usefixtures("enable_pip_pypi_access")
 def test_create(tox_project: ToxProjectCreator, demo_pkg_inline: Path) -> None:
     ini = """
     [testenv]
@@ -31,9 +32,9 @@ def test_create(tox_project: ToxProjectCreator, demo_pkg_inline: Path) -> None:
         platformdirs
 
     conda_deps =
-        platformdirs
+        numpy
     conda_channels=
-        conda-forge
+        pkgs/main
     conda_install_args=
         --override-channels
     conda_create_args=
@@ -42,4 +43,4 @@ def test_create(tox_project: ToxProjectCreator, demo_pkg_inline: Path) -> None:
     project = tox_project({"tox.ini": ini})
     result = project.run("r", "-e", "magic", "--root", str(demo_pkg_inline))
     result.assert_success()
-    assert "demo-pkg-inline 1.0.0" in result.out
+    assert "demo-pkg-inline" in result.out, result.out
