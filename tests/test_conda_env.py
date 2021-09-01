@@ -49,20 +49,30 @@ def test_install_deps_no_conda(newconfig, mocksession):
         [testenv:py123]
         deps=
             numpy
+            -r requirements.txt
             astropy
     """,
     )
 
+    config.toxinidir.join("requirements.txt").write("")
+
     venv, action, pcalls = create_test_env(config, mocksession, "py123")
 
-    assert len(venv.envconfig.deps) == 2
+    assert len(venv.envconfig.deps) == 3
     assert len(venv.envconfig.conda_deps) == 0
 
     tox_testenv_install_deps(action=action, venv=venv)
+
     assert len(pcalls) >= 1
     call = pcalls[-1]
     cmd = call.args
     assert cmd[6:9] == ["-m", "pip", "install"]
+    assert cmd[9] == "-rrequirements.txt"
+
+    # Get the deps from the requirements file.
+    with open(cmd[10][2:]) as stream:
+        deps = [line.strip() for line in stream.readlines()]
+    assert deps == ["numpy", "astropy"]
 
 
 def test_install_conda_deps(newconfig, mocksession):
@@ -98,11 +108,6 @@ def test_install_conda_deps(newconfig, mocksession):
 
     pip_cmd = pcalls[-1].args
     assert pip_cmd[6:9] == ["-m", "pip", "install"]
-
-    # Get the deps from the requirements file.
-    with open(pip_cmd[9][2:]) as stream:
-        deps = [line.strip() for line in stream.readlines()]
-    assert deps == ["numpy", "astropy"]
 
 
 def test_install_conda_no_pip(newconfig, mocksession):
