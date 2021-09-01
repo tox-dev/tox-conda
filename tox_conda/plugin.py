@@ -261,15 +261,32 @@ def tox_testenv_install_deps(venv, action):
         venv.envconfig.deps = venv.envconfig.deps[: -1 * num_conda_deps]
 
     if venv.envconfig.deps:
-        # Dump the pypi deps to a requirements file because, as of conda 4.10.1,
-        # the conda run command cannot parse a pip command with conditions on
-        # the dependencies.
-        _, temp_req_filename = tempfile.mkstemp()
-        with open(temp_req_filename, "w") as stream:
-            lines = ["{}\n".format(dep) for dep in venv.envconfig.deps]
-            stream.writelines(lines)
+        # As of conda 4.10.1, the conda run command cannot parse a pip command
+        # with conditions on the dependencies.
+        # The direct dependencies are thus dumped in a temporary requirements file,
+        # The dependencies declared in requirements and constraints files
+        # are not because this does not work: their path are treated by pip as
+        # relative to their parent requirements file directory.
+        deps_files_lines = []
+        deps_not_files = []
 
-        venv.envconfig.deps = [tox.config.DepConfig("-r{}".format(temp_req_filename))]
+        for dep in venv.envconfig.deps:
+            # The requirements and constraints files deps start with -r or -c.
+            if dep.name.startswith("-"):
+                deps_not_files += [dep]
+            else:
+                deps_files_lines += ["{}\n".format(dep)]
+
+        venv.envconfig.deps = deps_not_files
+
+        if deps_files_lines:
+            # Dump the direct pypi deps to a requirements file.
+            _, temp_req_filename = tempfile.mkstemp()
+
+            with open(temp_req_filename, "w") as stream:
+                stream.writelines(deps_files_lines)
+
+            venv.envconfig.deps.append(tox.config.DepConfig("-r{}".format(temp_req_filename)))
 
     with conda_run(venv, action):
         tox.venv.tox_testenv_install_deps(venv=venv, action=action)

@@ -140,6 +140,10 @@ section of configuration files:
   For instance, passing ``--override-channels`` will create more reproducible environments
   because the channels defined in the users ``.condarc`` will not interfer.
 
+* If `mamba <https://mamba.readthedocs.io>`_ is installed in the same environment as tox,
+  you may use it instead of the ``conda`` executable by setting the environment variable
+  ``CONDA_EXE=mamba`` in the shell where ``tox`` is called.
+
 An example configuration file is given below:
 
 ::
