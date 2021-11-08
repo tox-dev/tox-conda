@@ -35,6 +35,10 @@ useful for developers who rely on ``conda`` for environment management and
 package distribution but want to take advantage of the features provided by
 ``tox`` for test automation.
 
+As of version 0.8, ``tox-conda`` relies on the ``conda run`` command
+with the option ``--no-capture-output`` which is
+available since ``conda`` version 4.9.0.
+
 Getting Started
 ---------------
 
@@ -126,6 +130,20 @@ section of configuration files:
   a ``conda-env.yml`` file, will be used to *update* the environment *after* the
   initial environment creation.
 
+* ``conda_create_args``, which is used to pass arguments to the command ``conda create``.
+  The passed arguments are inserted in the command line before the python package.
+  For instance, passing ``--override-channels`` will create more reproducible environments
+  because the channels defined in the users ``.condarc`` will not interfer.
+
+* ``conda_install_args``, which is used to pass arguments to the command ``conda install``.
+  The passed arguments are inserted in the command line before the dependencies.
+  For instance, passing ``--override-channels`` will create more reproducible environments
+  because the channels defined in the users ``.condarc`` will not interfer.
+
+* If `mamba <https://mamba.readthedocs.io>`_ is installed in the same environment as tox,
+  you may use it instead of the ``conda`` executable by setting the environment variable
+  ``CONDA_EXE=mamba`` in the shell where ``tox`` is called.
+
 An example configuration file is given below:
 
 ::
@@ -144,6 +162,8 @@ An example configuration file is given below:
        stable: numpy=1.15
    conda_channels=
        conda-forge
+   conda_install_args=
+       --override-channels
    commands=
        pytest {posargs}
 
