@@ -49,20 +49,30 @@ def test_install_deps_no_conda(newconfig, mocksession):
         [testenv:py123]
         deps=
             numpy
+            -r requirements.txt
             astropy
     """,
     )
 
+    config.toxinidir.join("requirements.txt").write("")
+
     venv, action, pcalls = create_test_env(config, mocksession, "py123")
 
-    assert len(venv.envconfig.deps) == 2
+    assert len(venv.envconfig.deps) == 3
     assert len(venv.envconfig.conda_deps) == 0
 
     tox_testenv_install_deps(action=action, venv=venv)
+
     assert len(pcalls) >= 1
     call = pcalls[-1]
     cmd = call.args
-    assert cmd[1:4] == ["-m", "pip", "install"]
+    assert cmd[6:9] == ["-m", "pip", "install"]
+    assert cmd[9] == "-rrequirements.txt"
+
+    # Get the deps from the requirements file.
+    with open(cmd[10][2:]) as stream:
+        deps = [line.strip() for line in stream.readlines()]
+    assert deps == ["numpy", "astropy"]
 
 
 def test_install_conda_deps(newconfig, mocksession):
@@ -97,8 +107,7 @@ def test_install_conda_deps(newconfig, mocksession):
     assert conda_cmd[7:9] == ["pytest", "asdf"]
 
     pip_cmd = pcalls[-1].args
-    assert pip_cmd[1:4] == ["-m", "pip", "install"]
-    assert pip_cmd[4:6] == ["numpy", "astropy"]
+    assert pip_cmd[6:9] == ["-m", "pip", "install"]
 
 
 def test_install_conda_no_pip(newconfig, mocksession):
@@ -191,6 +200,30 @@ def test_conda_spec(tmpdir, newconfig, mocksession):
     assert conda_cmd[7:9] == ["numpy", "astropy"]
     assert conda_cmd[-1].startswith("--file")
     assert conda_cmd[-1].endswith("conda-spec.txt")
+
+
+def test_empty_conda_spec_and_env(tmpdir, newconfig, mocksession):
+    """Test environment creation when empty conda_spec and conda_env."""
+    txt = tmpdir.join("conda-spec.txt")
+    txt.write(
+        """
+        pytest
+        """
+    )
+    config = newconfig(
+        [],
+        """
+        [testenv:py123]
+        conda_env=
+          foo: path-to.yml
+        conda_spec=
+          foo: path-to.yml
+        """,
+    )
+    venv, _, _ = create_test_env(config, mocksession, "py123")
+
+    assert venv.envconfig.conda_spec is None
+    assert venv.envconfig.conda_env is None
 
 
 def test_conda_env(tmpdir, newconfig, mocksession):
@@ -299,3 +332,52 @@ def test_conda_env_and_spec(tmpdir, newconfig, mocksession):
     assert conda_cmd[6].startswith("python=")
     assert conda_cmd[-1].startswith("--file")
     assert conda_cmd[-1].endswith("conda-spec.txt")
+
+
+def test_conda_install_args(newconfig, mocksession):
+    config = newconfig(
+        [],
+        """
+        [testenv:py123]
+        conda_deps=
+            numpy
+        conda_install_args=
+            --override-channels
+    """,
+    )
+
+    venv, action, pcalls = create_test_env(config, mocksession, "py123")
+
+    assert len(venv.envconfig.conda_install_args) == 1
+
+    tox_testenv_install_deps(action=action, venv=venv)
+
+    call = pcalls[-1]
+    assert call.args[6] == "--override-channels"
+
+
+def test_conda_create_args(newconfig, mocksession):
+    config = newconfig(
+        [],
+        """
+        [testenv:py123]
+        conda_create_args=
+            --override-channels
+    """,
+    )
+
+    venv = VirtualEnv(config.envconfigs["py123"])
+    assert venv.path == config.envconfigs["py123"].envdir
+
+    with mocksession.newaction(venv.name, "getenv") as action:
+        tox_testenv_create(action=action, venv=venv)
+    pcalls = mocksession._pcalls
+    assert len(pcalls) >= 1
+    call = pcalls[-1]
+    assert "conda" in call.args[0]
+    assert "create" == call.args[1]
+    assert "--yes" == call.args[2]
+    assert "-p" == call.args[3]
+    assert venv.path == call.args[4]
+    assert call.args[5] == "--override-channels"
+    assert call.args[6].startswith("python=")
