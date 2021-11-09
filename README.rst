@@ -133,12 +133,12 @@ section of configuration files:
 * ``conda_create_args``, which is used to pass arguments to the command ``conda create``.
   The passed arguments are inserted in the command line before the python package.
   For instance, passing ``--override-channels`` will create more reproducible environments
-  because the channels defined in the users ``.condarc`` will not interfer.
+  because the channels defined in the user's ``.condarc`` will not interfer.
 
 * ``conda_install_args``, which is used to pass arguments to the command ``conda install``.
   The passed arguments are inserted in the command line before the dependencies.
   For instance, passing ``--override-channels`` will create more reproducible environments
-  because the channels defined in the users ``.condarc`` will not interfer.
+  because the channels defined in the user's ``.condarc`` will not interfer.
 
 * If `mamba <https://mamba.readthedocs.io>`_ is installed in the same environment as tox,
   you may use it instead of the ``conda`` executable by setting the environment variable
