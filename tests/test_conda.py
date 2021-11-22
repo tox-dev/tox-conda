@@ -89,7 +89,7 @@ def test_missing_conda(cmd, initproj, monkeypatch):
     # Prevent conda from being found.
     original_which = shutil.which
 
-    def which(path):
+    def which(path):  # pragma: no cover
         if path.endswith("conda"):
             return None
         return original_which(path)
