@@ -14,6 +14,8 @@ from tox.venv import VirtualEnv
 
 hookimpl = pluggy.HookimplMarker("tox")
 
+MISSING_CONDA_ERROR = "Cannot locate the conda executable."
+
 
 class CondaDepOption(DepOption):
     name = "conda_deps"
@@ -160,12 +162,20 @@ def find_conda():
 
     path = shutil.which("conda")
 
+    if path is None:
+        _exit_on_missing_conda()
+
     try:
         subprocess.check_call([str(path), "-h"])
     except subprocess.CalledProcessError:
-        raise RuntimeError("Can't locate conda executable")
+        _exit_on_missing_conda()
 
     return path
+
+
+def _exit_on_missing_conda():
+    tox.reporter.error(MISSING_CONDA_ERROR)
+    raise SystemExit(0)
 
 
 @hookimpl

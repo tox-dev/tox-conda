@@ -1,3 +1,8 @@
+import shutil
+
+import tox_conda.plugin
+
+
 def test_conda(cmd, initproj):
     initproj(
         "pkg-1",
@@ -66,3 +71,31 @@ def test_conda_run_command(cmd, initproj):
 
     for filename in ("commands_pre", "commands_post", "commands"):
         assert open(filename).read().endswith(env_name)
+
+
+def test_missing_conda(cmd, initproj, monkeypatch):
+    """Check that an error is shown when the conda executable is not found."""
+
+    initproj(
+        "pkg-1",
+        filedefs={
+            "tox.ini": """
+                [tox]
+                require = tox-conda
+            """,
+        },
+    )
+
+    # Prevent conda from being found.
+    original_which = shutil.which
+
+    def which(path):  # pragma: no cover
+        if path.endswith("conda"):
+            return None
+        return original_which(path)
+
+    monkeypatch.setattr(shutil, "which", which)
+
+    result = cmd()
+
+    assert result.outlines == ["ERROR: {}".format(tox_conda.plugin.MISSING_CONDA_ERROR)]
