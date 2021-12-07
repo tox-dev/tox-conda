@@ -166,7 +166,7 @@ def find_conda():
         _exit_on_missing_conda()
 
     try:
-        subprocess.check_call([str(path), "-h"])
+        subprocess.run([str(path), "-h"], stdout=subprocess.DEVNULL)
     except subprocess.CalledProcessError:
         _exit_on_missing_conda()
 
