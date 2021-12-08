@@ -90,13 +90,7 @@ def test_install_deps_no_conda(newconfig, mocksession, monkeypatch):
     assert re.match(pattern, script_lines[0])
 
     cmd = script_lines[1].split()
-    assert cmd[-5:-2] == ["-m", "pip", "install"]
-    assert cmd[-2] == "-rrequirements.txt"
-
-    # Get the deps from the requirements file.
-    with open(cmd[-1][2:]) as stream:
-        deps = [line.strip() for line in stream.readlines()]
-    assert deps == ["numpy", "astropy"]
+    assert cmd[-6:] == ["-m", "pip", "install", "numpy", "-rrequirements.txt", "astropy"]
 
 
 def test_install_conda_deps(newconfig, mocksession):
