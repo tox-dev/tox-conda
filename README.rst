@@ -35,9 +35,7 @@ useful for developers who rely on ``conda`` for environment management and
 package distribution but want to take advantage of the features provided by
 ``tox`` for test automation.
 
-As of version 0.8, ``tox-conda`` relies on the ``conda run`` command
-with the option ``--no-capture-output`` which is
-available since ``conda`` version 4.9.0.
+``tox-conda`` has not been tested with ``conda`` version below 4.5.
 
 Getting Started
 ---------------

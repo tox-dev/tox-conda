@@ -9,7 +9,7 @@ import tox
 
 
 class PopenInActivatedEnvBase(abc.ABC):
-    """A functor that calls popen in an activated anaconda env."""
+    """A base functor that wraps popen calls in an activated anaconda env."""
 
     def __init__(self, venv, popen):
         self._venv = venv
@@ -21,13 +21,13 @@ class PopenInActivatedEnvBase(abc.ABC):
 
     @abc.abstractmethod
     def _wrap_cmd_args(self, cmd_args):
-        ...
+        """Return the wrapped command arguments."""
 
 
 class PopenInActivatedEnvPosix(PopenInActivatedEnvBase):
-    """Call popen in an activated anaconda env on POSIX platforms.
+    """Wrap popen calls in an activated anaconda env for POSIX platforms.
 
-    The command to be executed are written to a temporary shell script.
+    The command line to be executed are written to a temporary shell script.
     The shell script first activates the env.
     """
 
@@ -44,10 +44,11 @@ class PopenInActivatedEnvPosix(PopenInActivatedEnvBase):
         with tempfile.NamedTemporaryFile() as fp:
             self.__tmp_file = fp.name
 
-        cmd_args_shell = " ".join(map(pipes.quote, cmd_args))
+        # Convert the command args to a command line.
+        cmd_line = " ".join(map(pipes.quote, cmd_args))
 
         with open(self.__tmp_file, "w") as fp:
-            fp.writelines((conda_activate_cmd, "\n", cmd_args_shell))
+            fp.writelines((conda_activate_cmd, "\n", cmd_line))
 
         return ["/bin/sh", self.__tmp_file]
 
@@ -58,9 +59,11 @@ class PopenInActivatedEnvPosix(PopenInActivatedEnvBase):
 
 
 class PopenInActivatedEnvWindows(PopenInActivatedEnvBase):
-    """Call popen in an activated anaconda env on Windows.
+    """Wrap popen call in an activated anaconda env for Windows.
 
     The shell is temporary forced to cmd.exe and the env is activated accordingly.
+    This works without a script, the env activation command and the target
+    command line are concatenated into a single command line.
     """
 
     def __call__(self, cmd_args, **kwargs):
@@ -110,7 +113,6 @@ else:
 @contextmanager
 def activate_env(venv, action=None):
     """Run a command in a temporary activated anaconda env."""
-    # Backup popen before setting it with the one in an activated env.
     if action is None:
         initial_popen = venv.popen
         venv.popen = PopenInActivatedEnv(venv, initial_popen)
@@ -120,7 +122,6 @@ def activate_env(venv, action=None):
 
     yield
 
-    # Revert popen to its initial value.
     if action is None:
         venv.popen = initial_popen
     else:
