@@ -1,7 +1,10 @@
 import os
+import re
 
+import tox
 from tox.venv import VirtualEnv
 
+from tox_conda.env_activator import PopenInActivatedEnv
 from tox_conda.plugin import tox_testenv_create, tox_testenv_install_deps
 
 
@@ -41,22 +44,28 @@ def create_test_env(config, mocksession, envname):
     return venv, action, pcalls
 
 
-def test_install_deps_no_conda(newconfig, mocksession):
+def test_install_deps_no_conda(newconfig, mocksession, monkeypatch):
     """Test installation using conda when no conda_deps are given"""
+    # No longer remove the temporary script, so we can check its contents.
+    monkeypatch.delattr(PopenInActivatedEnv, "__del__", raising=False)
+
+    env_name = "py123"
     config = newconfig(
         [],
         """
-        [testenv:py123]
+        [testenv:{}]
         deps=
             numpy
             -r requirements.txt
             astropy
-    """,
+    """.format(
+            env_name
+        ),
     )
 
     config.toxinidir.join("requirements.txt").write("")
 
-    venv, action, pcalls = create_test_env(config, mocksession, "py123")
+    venv, action, pcalls = create_test_env(config, mocksession, env_name)
 
     assert len(venv.envconfig.deps) == 3
     assert len(venv.envconfig.conda_deps) == 0
@@ -64,15 +73,24 @@ def test_install_deps_no_conda(newconfig, mocksession):
     tox_testenv_install_deps(action=action, venv=venv)
 
     assert len(pcalls) >= 1
-    call = pcalls[-1]
-    cmd = call.args
-    assert cmd[6:9] == ["-m", "pip", "install"]
-    assert cmd[9] == "-rrequirements.txt"
 
-    # Get the deps from the requirements file.
-    with open(cmd[10][2:]) as stream:
-        deps = [line.strip() for line in stream.readlines()]
-    assert deps == ["numpy", "astropy"]
+    call = pcalls[-1]
+
+    if tox.INFO.IS_WIN:
+        script_lines = " ".join(call.args).split(" && ", maxsplit=1)
+        pattern = r"conda\.bat activate .*{}".format(re.escape(env_name))
+    else:
+        # Get the cmd args from the script.
+        shell, cmd_script = call.args
+        assert shell == "/bin/sh"
+        with open(cmd_script) as stream:
+            script_lines = stream.readlines()
+        pattern = r"eval \$\(/.*/conda shell\.posix activate /.*/{}\)".format(env_name)
+
+    assert re.match(pattern, script_lines[0])
+
+    cmd = script_lines[1].split()
+    assert cmd[-6:] == ["-m", "pip", "install", "numpy", "-rrequirements.txt", "astropy"]
 
 
 def test_install_conda_deps(newconfig, mocksession):
@@ -102,12 +120,9 @@ def test_install_conda_deps(newconfig, mocksession):
     assert "conda" in os.path.split(conda_cmd[0])[-1]
     assert conda_cmd[1:6] == ["install", "--quiet", "--yes", "-p", venv.path]
     # Make sure that python is explicitly given as part of every conda install
-    # in order to avoid inadvertant upgrades of python itself.
+    # in order to avoid inadvertent upgrades of python itself.
     assert conda_cmd[6].startswith("python=")
     assert conda_cmd[7:9] == ["pytest", "asdf"]
-
-    pip_cmd = pcalls[-1].args
-    assert pip_cmd[6:9] == ["-m", "pip", "install"]
 
 
 def test_install_conda_no_pip(newconfig, mocksession):

@@ -3,14 +3,14 @@ import os
 import re
 import shutil
 import subprocess
-import tempfile
-from contextlib import contextmanager
 
 import pluggy
 import py.path
 import tox
 from tox.config import DepConfig, DepOption, TestenvConfig
 from tox.venv import VirtualEnv
+
+from .env_activator import activate_env
 
 hookimpl = pluggy.HookimplMarker("tox")
 
@@ -50,44 +50,6 @@ def get_py_version(envconfig, action):
         version = result.decode("utf-8").strip()
 
     return "python={}".format(version)
-
-
-class CondaRunWrapper:
-    """A functor that execute a command via conda run.
-
-    It wraps popen so the command is executed in the context of an activated env.
-    """
-
-    CONDA_RUN_CMD_PREFIX = "{conda_exe} run --no-capture-output -p {envdir}"
-
-    def __init__(self, venv, popen):
-        self.__venv = venv
-        self.__popen = popen
-
-    def __call__(self, cmd_args, **kwargs):
-        conda_run_cmd_prefix = self.CONDA_RUN_CMD_PREFIX.format(
-            conda_exe=self.__venv.envconfig.conda_exe, envdir=self.__venv.envconfig.envdir
-        )
-        cmd_args = conda_run_cmd_prefix.split() + cmd_args
-        return self.__popen(cmd_args, **kwargs)
-
-
-@contextmanager
-def conda_run(venv, action=None):
-    """Run a command via conda run."""
-    if action is None:
-        initial_popen = venv.popen
-        venv.popen = CondaRunWrapper(venv, initial_popen)
-    else:
-        initial_popen = action.via_popen
-        action.via_popen = CondaRunWrapper(venv, initial_popen)
-
-    yield
-
-    if action is None:
-        venv.popen = initial_popen
-    else:
-        action.via_popen = initial_popen
 
 
 @hookimpl
@@ -166,7 +128,7 @@ def find_conda():
         _exit_on_missing_conda()
 
     try:
-        subprocess.check_call([str(path), "-h"])
+        subprocess.run([str(path), "-h"], stdout=subprocess.DEVNULL)
     except subprocess.CalledProcessError:
         _exit_on_missing_conda()
 
@@ -270,35 +232,7 @@ def tox_testenv_install_deps(venv, action):
         # to be present when we call pip install.
         venv.envconfig.deps = venv.envconfig.deps[: -1 * num_conda_deps]
 
-    if venv.envconfig.deps:
-        # As of conda 4.10.1, the conda run command cannot parse a pip command
-        # with conditions on the dependencies.
-        # The direct dependencies are thus dumped in a temporary requirements file,
-        # The dependencies declared in requirements and constraints files
-        # are not because this does not work: their path are treated by pip as
-        # relative to their parent requirements file directory.
-        deps_files_lines = []
-        deps_not_files = []
-
-        for dep in venv.envconfig.deps:
-            # The requirements and constraints files deps start with -r or -c.
-            if dep.name.startswith("-"):
-                deps_not_files += [dep]
-            else:
-                deps_files_lines += ["{}\n".format(dep)]
-
-        venv.envconfig.deps = deps_not_files
-
-        if deps_files_lines:
-            # Dump the direct pypi deps to a requirements file.
-            _, temp_req_filename = tempfile.mkstemp()
-
-            with open(temp_req_filename, "w") as stream:
-                stream.writelines(deps_files_lines)
-
-            venv.envconfig.deps.append(tox.config.DepConfig("-r{}".format(temp_req_filename)))
-
-    with conda_run(venv, action):
+    with activate_env(venv, action):
         tox.venv.tox_testenv_install_deps(venv=venv, action=action)
 
     # Restore the deps.
@@ -349,18 +283,18 @@ VirtualEnv._venv_lookup = venv_lookup
 
 @hookimpl(hookwrapper=True)
 def tox_runtest_pre(venv):
-    with conda_run(venv):
+    with activate_env(venv):
         yield
 
 
 @hookimpl
 def tox_runtest(venv, redirect):
-    with conda_run(venv):
+    with activate_env(venv):
         tox.venv.tox_runtest(venv, redirect)
     return True
 
 
 @hookimpl(hookwrapper=True)
 def tox_runtest_post(venv):
-    with conda_run(venv):
+    with activate_env(venv):
         yield
