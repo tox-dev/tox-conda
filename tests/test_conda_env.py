@@ -85,7 +85,7 @@ def test_install_deps_no_conda(newconfig, mocksession, monkeypatch):
         assert shell == "/bin/sh"
         with open(cmd_script) as stream:
             script_lines = stream.readlines()
-        pattern = r"eval \$\(/.*/conda shell\.posix activate /.*/{}\)".format(env_name)
+        pattern = r"eval \"\$\(/.*/conda shell\.posix activate /.*/{}\)\"".format(env_name)
 
     assert re.match(pattern, script_lines[0])
 

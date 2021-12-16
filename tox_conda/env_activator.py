@@ -36,8 +36,11 @@ class PopenInActivatedEnvPosix(PopenInActivatedEnvBase):
         self.__tmp_file = None
 
     def _wrap_cmd_args(self, cmd_args):
-        conda_activate_cmd = "eval $({conda_exe} shell.posix activate {envdir})".format(
-            conda_exe=self._venv.envconfig.conda_exe, envdir=self._venv.envconfig.envdir
+        conda_exe = pipes.quote(str(self._venv.envconfig.conda_exe))
+        envdir = pipes.quote(str(self._venv.envconfig.envdir))
+
+        conda_activate_cmd = 'eval "$({conda_exe} shell.posix activate {envdir})"'.format(
+            conda_exe=conda_exe, envdir=envdir
         )
 
         # Get a temporary file path.
