@@ -1,5 +1,7 @@
 import shutil
 
+import tox
+
 import tox_conda.plugin
 
 
@@ -99,3 +101,52 @@ def test_missing_conda(cmd, initproj, monkeypatch):
     result = cmd()
 
     assert result.outlines == ["ERROR: {}".format(tox_conda.plugin.MISSING_CONDA_ERROR)]
+
+
+def test_issue_115(cmd, initproj):
+    """Verify that a conda activation script is sourced.
+
+    https://docs.conda.io/projects/conda-build/en/latest/resources/activate-scripts.html
+    """
+    if tox.INFO.IS_WIN:
+        build_script_name = "build.bat"
+        build_script = """
+            setlocal EnableDelayedExpansion
+            mkdir %CONDA_PREFIX%\\etc\\conda\\activate.d
+            copy activate.bat %CONDA_PREFIX%\\etc\\conda\\activate.d
+        """
+        activate_script_name = "activate.bat"
+        activate_script = """
+            set DUMMY=0
+        """
+        commands_pre = "build.bat"
+
+    else:
+        build_script_name = "build.sh"
+        build_script = """
+            mkdir -p "${CONDA_PREFIX}/etc/conda/activate.d"
+            cp activate.sh "${CONDA_PREFIX}/etc/conda/activate.d"
+        """
+        activate_script_name = "activate.sh"
+        activate_script = """
+            export DUMMY=0
+        """
+        commands_pre = "/bin/sh build.sh"
+
+    initproj(
+        "115",
+        filedefs={
+            build_script_name: build_script,
+            activate_script_name: activate_script,
+            "tox.ini": """
+                [testenv]
+                commands_pre = {}
+                commands = python -c "import os; assert 'DUMMY' in os.environ"
+            """.format(
+                commands_pre
+            ),
+        },
+    )
+
+    result = cmd()
+    result.assert_success()
