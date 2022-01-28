@@ -6,8 +6,9 @@ import tox_conda.plugin
 
 
 def test_conda(cmd, initproj):
+    # The path has a blank space on purpose for testing issue #119.
     initproj(
-        "pkg-1",
+        "pkg 1",
         filedefs={
             "tox.ini": """
                 [tox]
