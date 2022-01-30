@@ -1,7 +1,7 @@
 """Wrap the tox command for subprocess to activate the target anaconda env."""
 import abc
 import os
-import pipes
+import shlex
 import tempfile
 from contextlib import contextmanager
 
@@ -36,8 +36,8 @@ class PopenInActivatedEnvPosix(PopenInActivatedEnvBase):
         self.__tmp_file = None
 
     def _wrap_cmd_args(self, cmd_args):
-        conda_exe = pipes.quote(str(self._venv.envconfig.conda_exe))
-        envdir = pipes.quote(str(self._venv.envconfig.envdir))
+        conda_exe = shlex.quote(str(self._venv.envconfig.conda_exe))
+        envdir = shlex.quote(str(self._venv.envconfig.envdir))
 
         conda_activate_cmd = 'eval "$({conda_exe} shell.posix activate {envdir})"'.format(
             conda_exe=conda_exe, envdir=envdir
@@ -48,7 +48,7 @@ class PopenInActivatedEnvPosix(PopenInActivatedEnvBase):
             self.__tmp_file = fp.name
 
         # Convert the command args to a command line.
-        cmd_line = " ".join(map(pipes.quote, cmd_args))
+        cmd_line = " ".join(map(shlex.quote, cmd_args))
 
         with open(self.__tmp_file, "w") as fp:
             fp.writelines((conda_activate_cmd, "\n", cmd_line))
@@ -85,10 +85,7 @@ class PopenInActivatedEnvWindows(PopenInActivatedEnvBase):
         return output
 
     def _wrap_cmd_args(self, cmd_args):
-        conda_activate_cmd = "conda.bat activate {envdir}".format(
-            envdir=self._venv.envconfig.envdir
-        )
-        return conda_activate_cmd.split() + ["&&"] + cmd_args
+        return ["conda.bat", "activate", str(self._venv.envconfig.envdir), "&&"] + cmd_args
 
     def __ensure_comspecs_is_cmd_exe(self):
         if os.path.basename(os.environ.get("COMSPEC", "")).lower() == "cmd.exe":
