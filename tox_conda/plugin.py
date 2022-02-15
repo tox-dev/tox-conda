@@ -140,6 +140,11 @@ def _exit_on_missing_conda():
     raise SystemExit(0)
 
 
+def _run_conda_process(args, venv, action, cwd):
+    redirect = tox.reporter.verbosity() < tox.reporter.Verbosity.DEBUG
+    venv._pcall(args, venv=False, action=action, cwd=cwd, redirect=redirect)
+
+
 @hookimpl
 def tox_testenv_create(venv, action):
     tox.venv.cleanup_for_venv(venv)
@@ -172,7 +177,7 @@ def tox_testenv_create(venv, action):
 
         args += [python]
 
-    venv._pcall(args, venv=False, action=action, cwd=basepath)
+    _run_conda_process(args, venv, action, basepath)
 
     venv.envconfig.conda_python = python
 
@@ -213,7 +218,8 @@ def install_conda_deps(venv, action, basepath, envdir):
     # with the installed python version, installation will fail (which is what
     # we want).
     args += [venv.envconfig.conda_python] + conda_deps
-    venv._pcall(args, venv=False, action=action, cwd=basepath)
+
+    _run_conda_process(args, venv, action, basepath)
 
 
 @hookimpl
