@@ -30,7 +30,7 @@ def postprocess_path_option(testenv_config, value):
 
 def get_py_version(envconfig, action):
     # Try to use basepython
-    match = re.match(r"python(\d)(?:\.(\d+))?(?:\.?(\d))?", envconfig.basepython)
+    match = re.match(r"python(\d)(?:\.(\d+))?(?:\.?(\d+))?", envconfig.basepython)
     if match:
         groups = match.groups()
         version = groups[0]
