@@ -107,10 +107,7 @@ def test_conda_force_deps(tmpdir, newconfig):
     assert "something<42.1" == config.envconfigs["py1"].conda_deps[0].name
 
 
-@pytest.mark.parametrize(
-    "spec",
-    ["3", "3.4.5", "3.8.11", "3.10"]
-)
+@pytest.mark.parametrize("spec", ["3", "3.4.5", "3.8.11", "3.10"])
 def test_basepython_parsing(spec, tmpdir, newconfig):
     config = newconfig(
         [],
@@ -119,7 +116,7 @@ def test_basepython_parsing(spec, tmpdir, newconfig):
         toxworkdir = {tmpdir}
         [testenv:py1]
         basepython = python{spec}
-    """
+    """,
     )
 
     py_version = tox_conda.plugin.get_py_version(config.envconfigs["py1"], None)
