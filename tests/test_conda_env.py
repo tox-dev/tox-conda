@@ -418,7 +418,9 @@ def test_verbosity(newconfig, mocksession):
     assert "install" == call.args[1]
     assert isinstance(call.stdout, io.IOBase)
 
-    tox.reporter.update_default_reporter(tox.reporter.Verbosity.DEFAULT, tox.reporter.Verbosity.DEBUG)
+    tox.reporter.update_default_reporter(
+        tox.reporter.Verbosity.DEFAULT, tox.reporter.Verbosity.DEBUG
+    )
     venv, action, pcalls = create_test_env(config, mocksession, "py2")
     tox_testenv_install_deps(action=action, venv=venv)
     assert len(pcalls) == 1
