@@ -1,3 +1,4 @@
+import io
 import os
 import re
 
@@ -396,3 +397,32 @@ def test_conda_create_args(newconfig, mocksession):
     assert venv.path == call.args[4]
     assert call.args[5] == "--override-channels"
     assert call.args[6].startswith("python=")
+
+
+def test_verbosity(newconfig, mocksession):
+    config = newconfig(
+        [],
+        """
+        [testenv:py1]
+        conda_deps=numpy
+        [testenv:py2]
+        conda_deps=numpy
+    """,
+    )
+
+    venv, action, pcalls = create_test_env(config, mocksession, "py1")
+    tox_testenv_install_deps(action=action, venv=venv)
+    assert len(pcalls) == 1
+    call = pcalls[0]
+    assert "conda" in call.args[0]
+    assert "install" == call.args[1]
+    assert isinstance(call.stdout, io.IOBase)
+
+    tox.reporter.update_default_reporter(tox.reporter.Verbosity.DEFAULT, tox.reporter.Verbosity.DEBUG)
+    venv, action, pcalls = create_test_env(config, mocksession, "py2")
+    tox_testenv_install_deps(action=action, venv=venv)
+    assert len(pcalls) == 1
+    call = pcalls[0]
+    assert "conda" in call.args[0]
+    assert "install" == call.args[1]
+    assert not isinstance(call.stdout, io.IOBase)
