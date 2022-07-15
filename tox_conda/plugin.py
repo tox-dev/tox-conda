@@ -102,10 +102,12 @@ def tox_configure(config):
         envconfig.setenv["CONDA_DEFAULT_ENV"] = envconfig.setenv["TOX_ENV_DIR"]
 
         conda_deps = [DepConfig(str(name)) for name in envconfig.conda_deps]
-        # Add the conda-spec.txt file to the end of the conda deps b/c any deps
-        # after --file option(s) are ignored
+        # Append filenames of additional dependency sources. tox will automatically hash
+        # their contents to detect changes.
         if envconfig.conda_spec is not None:
-            conda_deps.append(DepConfig("--file={}".format(envconfig.conda_spec)))
+            conda_deps.append(DepConfig(envconfig.conda_spec))
+        if envconfig.conda_env is not None:
+            conda_deps.append(DepConfig(envconfig.conda_env))
         envconfig.deps.extend(conda_deps)
 
         envconfig.conda_exe = conda_exe
@@ -181,6 +183,12 @@ def tox_testenv_create(venv, action):
 
     venv.envconfig.conda_python = python
 
+    if venv.envconfig.conda_env is not None:
+        # As conda env create doesn't take additional dependencies we install python afterwards
+        install_conda_deps(
+            venv, action, venv.path.dirpath(), venv.envconfig.envdir, python_only=True
+        )
+
     # let the venv know about the target interpreter just installed in our conda env, otherwise
     # we'll have a mismatch later because tox expects the interpreter to be existing outside of
     # the env
@@ -194,15 +202,18 @@ def tox_testenv_create(venv, action):
     return True
 
 
-def install_conda_deps(venv, action, basepath, envdir):
-    # Account for the fact that we have a list of DepOptions
-    conda_deps = [str(dep.name) for dep in venv.envconfig.conda_deps]
-    # Add the conda-spec.txt file to the end of the conda deps b/c any deps
-    # after --file option(s) are ignored
-    if venv.envconfig.conda_spec is not None:
-        conda_deps.append("--file={}".format(venv.envconfig.conda_spec))
+def install_conda_deps(venv, action, basepath, envdir, python_only=False):
+    if python_only:
+        conda_deps = []
+    else:
+        # Account for the fact that we have a list of DepOptions
+        conda_deps = [str(dep.name) for dep in venv.envconfig.conda_deps]
+        # Add the conda-spec.txt file to the end of the conda deps b/c any deps
+        # after --file option(s) are ignored
+        if venv.envconfig.conda_spec is not None:
+            conda_deps.append("--file={}".format(venv.envconfig.conda_spec))
 
-    action.setactivity("installcondadeps", ", ".join(conda_deps))
+        action.setactivity("installcondadeps", ", ".join(conda_deps))
 
     # Install quietly to make the log cleaner
     args = [venv.envconfig.conda_exe, "install", "--quiet", "--yes", "-p", envdir]
@@ -229,6 +240,8 @@ def tox_testenv_install_deps(venv, action):
 
     num_conda_deps = len(venv.envconfig.conda_deps)
     if venv.envconfig.conda_spec is not None:
+        num_conda_deps += 1
+    if venv.envconfig.conda_env is not None:
         num_conda_deps += 1
 
     if num_conda_deps > 0:
