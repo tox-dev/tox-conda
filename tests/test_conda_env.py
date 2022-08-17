@@ -286,6 +286,7 @@ def test_conda_env(tmpdir, newconfig, mocksession):
     assert cmd[1:4] == ["env", "create", "-p"]
     assert venv.path == call.args[4]
     assert call.args[5].startswith("--file")
+    assert cmd[6].endswith(".yaml")
 
     yaml = YAML()
     tmp_env = yaml.load(Path(cmd[6]))
@@ -338,6 +339,7 @@ def test_conda_env_and_spec(tmpdir, newconfig, mocksession):
     assert cmd[1:4] == ["env", "create", "-p"]
     assert venv.path == call.args[4]
     assert call.args[5].startswith("--file")
+    assert cmd[6].endswith(".yaml")
 
     yaml = YAML()
     tmp_env = yaml.load(Path(cmd[6]))

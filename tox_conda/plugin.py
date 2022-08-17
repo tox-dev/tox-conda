@@ -167,7 +167,7 @@ def tox_testenv_create(venv, action, _test_leave_tmp_env=False):
         env_file = yaml.load(Path(venv.envconfig.conda_env))
         env_file["dependencies"].append(python)
 
-        with tempfile.NamedTemporaryFile(delete=False) as tmp_env:
+        with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False) as tmp_env:
             yaml.dump(env_file, tmp_env)
 
         args = [
