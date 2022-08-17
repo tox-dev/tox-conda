@@ -3,13 +3,13 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 
 import pluggy
 import py.path
-from ruamel.yaml import YAML
-import tempfile
 import tox
+from ruamel.yaml import YAML
 from tox.config import DepConfig, DepOption, TestenvConfig
 from tox.venv import VirtualEnv
 
