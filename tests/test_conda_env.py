@@ -277,20 +277,14 @@ def test_conda_env(tmpdir, newconfig, mocksession):
     with mocksession.newaction(venv.name, "getenv") as action:
         tox_testenv_create(action=action, venv=venv)
     pcalls = mocksession._pcalls
-    assert len(pcalls) >= 2
-    call = pcalls[-2]
+    assert len(pcalls) >= 1
+    call = pcalls[-1]
     cmd = call.args
     assert "conda" in os.path.split(cmd[0])[-1]
     assert cmd[1:4] == ["env", "create", "-p"]
     assert venv.path == call.args[4]
     assert call.args[5].startswith("--file")
     assert call.args[6].endswith("conda-env.yml")
-
-    call = pcalls[-1]
-    cmd = call.args
-    assert "conda" in os.path.split(cmd[0])[-1]
-    assert cmd[1:6] == ["install", "--quiet", "--yes", "-p", venv.path]
-    assert cmd[6].startswith("python=")
 
 
 def test_conda_env_and_spec(tmpdir, newconfig, mocksession):
@@ -331,20 +325,14 @@ def test_conda_env_and_spec(tmpdir, newconfig, mocksession):
     with mocksession.newaction(venv.name, "getenv") as action:
         tox_testenv_create(action=action, venv=venv)
     pcalls = mocksession._pcalls
-    assert len(pcalls) >= 2
-    call = pcalls[-2]
+    assert len(pcalls) >= 1
+    call = pcalls[-1]
     cmd = call.args
     assert "conda" in os.path.split(cmd[0])[-1]
     assert cmd[1:4] == ["env", "create", "-p"]
     assert venv.path == call.args[4]
     assert call.args[5].startswith("--file")
     assert call.args[6].endswith("conda-env.yml")
-
-    call = pcalls[-1]
-    cmd = call.args
-    assert "conda" in os.path.split(cmd[0])[-1]
-    assert cmd[1:6] == ["install", "--quiet", "--yes", "-p", venv.path]
-    assert cmd[6].startswith("python=")
 
     with mocksession.newaction(venv.name, "getenv") as action:
         tox_testenv_install_deps(action=action, venv=venv)
