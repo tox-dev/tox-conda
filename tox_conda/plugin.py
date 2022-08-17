@@ -3,9 +3,12 @@ import os
 import re
 import shutil
 import subprocess
+from pathlib import Path
 
 import pluggy
 import py.path
+from ruamel.yaml import YAML
+import tempfile
 import tox
 from tox.config import DepConfig, DepOption, TestenvConfig
 from tox.venv import VirtualEnv
@@ -148,7 +151,7 @@ def _run_conda_process(args, venv, action, cwd):
 
 
 @hookimpl
-def tox_testenv_create(venv, action):
+def tox_testenv_create(venv, action, _test_leave_tmp_env=False):
     tox.venv.cleanup_for_venv(venv)
     basepath = venv.path.dirpath()
 
@@ -160,6 +163,13 @@ def tox_testenv_create(venv, action):
         # conda env create does not have a --channel argument nor does it take
         # dependencies specifications (e.g., python=3.8). These must all be specified
         # in the conda-env.yml file
+        yaml = YAML()
+        env_file = yaml.load(Path(venv.envconfig.conda_env))
+        env_file["dependencies"].append(python)
+
+        with tempfile.NamedTemporaryFile(delete=False) as tmp_env:
+            yaml.dump(env_file, tmp_env)
+
         args = [
             venv.envconfig.conda_exe,
             "env",
@@ -167,8 +177,12 @@ def tox_testenv_create(venv, action):
             "-p",
             envdir,
             "--file",
-            venv.envconfig.conda_env,
+            tmp_env.name,
         ]
+
+        _run_conda_process(args, venv, action, basepath)
+        if not _test_leave_tmp_env:
+            os.unlink(tmp_env.name)
     else:
         args = [venv.envconfig.conda_exe, "create", "--yes", "-p", envdir]
         for channel in venv.envconfig.conda_channels:
@@ -179,15 +193,9 @@ def tox_testenv_create(venv, action):
 
         args += [python]
 
-    _run_conda_process(args, venv, action, basepath)
+        _run_conda_process(args, venv, action, basepath)
 
     venv.envconfig.conda_python = python
-
-    if venv.envconfig.conda_env is not None:
-        # As conda env create doesn't take additional dependencies we install python afterwards
-        install_conda_deps(
-            venv, action, venv.path.dirpath(), venv.envconfig.envdir, python_only=True
-        )
 
     # let the venv know about the target interpreter just installed in our conda env, otherwise
     # we'll have a mismatch later because tox expects the interpreter to be existing outside of
@@ -202,18 +210,15 @@ def tox_testenv_create(venv, action):
     return True
 
 
-def install_conda_deps(venv, action, basepath, envdir, python_only=False):
-    if python_only:
-        conda_deps = []
-    else:
-        # Account for the fact that we have a list of DepOptions
-        conda_deps = [str(dep.name) for dep in venv.envconfig.conda_deps]
-        # Add the conda-spec.txt file to the end of the conda deps b/c any deps
-        # after --file option(s) are ignored
-        if venv.envconfig.conda_spec is not None:
-            conda_deps.append("--file={}".format(venv.envconfig.conda_spec))
+def install_conda_deps(venv, action, basepath, envdir):
+    # Account for the fact that we have a list of DepOptions
+    conda_deps = [str(dep.name) for dep in venv.envconfig.conda_deps]
+    # Add the conda-spec.txt file to the end of the conda deps b/c any deps
+    # after --file option(s) are ignored
+    if venv.envconfig.conda_spec is not None:
+        conda_deps.append("--file={}".format(venv.envconfig.conda_spec))
 
-        action.setactivity("installcondadeps", ", ".join(conda_deps))
+    action.setactivity("installcondadeps", ", ".join(conda_deps))
 
     # Install quietly to make the log cleaner
     args = [venv.envconfig.conda_exe, "install", "--quiet", "--yes", "-p", envdir]

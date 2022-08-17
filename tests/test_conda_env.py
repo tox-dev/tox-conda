@@ -1,8 +1,10 @@
 import io
 import os
 import re
+from pathlib import Path
 
 import tox
+from ruamel.yaml import YAML
 from tox.venv import VirtualEnv
 
 from tox_conda.env_activator import PopenInActivatedEnv
@@ -275,7 +277,7 @@ def test_conda_env(tmpdir, newconfig, mocksession):
     assert venv.envconfig.conda_env
 
     with mocksession.newaction(venv.name, "getenv") as action:
-        tox_testenv_create(action=action, venv=venv)
+        tox_testenv_create(action=action, venv=venv, _test_leave_tmp_env=True)
     pcalls = mocksession._pcalls
     assert len(pcalls) >= 1
     call = pcalls[-1]
@@ -284,7 +286,11 @@ def test_conda_env(tmpdir, newconfig, mocksession):
     assert cmd[1:4] == ["env", "create", "-p"]
     assert venv.path == call.args[4]
     assert call.args[5].startswith("--file")
-    assert call.args[6].endswith("conda-env.yml")
+
+    yaml = YAML()
+    tmp_env = yaml.load(Path(cmd[6]))
+    assert tmp_env["dependencies"][-1].startswith("python=")
+    os.unlink(cmd[6])
 
 
 def test_conda_env_and_spec(tmpdir, newconfig, mocksession):
@@ -323,7 +329,7 @@ def test_conda_env_and_spec(tmpdir, newconfig, mocksession):
     assert venv.envconfig.conda_spec
 
     with mocksession.newaction(venv.name, "getenv") as action:
-        tox_testenv_create(action=action, venv=venv)
+        tox_testenv_create(action=action, venv=venv, _test_leave_tmp_env=True)
     pcalls = mocksession._pcalls
     assert len(pcalls) >= 1
     call = pcalls[-1]
@@ -332,7 +338,11 @@ def test_conda_env_and_spec(tmpdir, newconfig, mocksession):
     assert cmd[1:4] == ["env", "create", "-p"]
     assert venv.path == call.args[4]
     assert call.args[5].startswith("--file")
-    assert call.args[6].endswith("conda-env.yml")
+
+    yaml = YAML()
+    tmp_env = yaml.load(Path(cmd[6]))
+    assert tmp_env["dependencies"][-1].startswith("python=")
+    os.unlink(cmd[6])
 
     with mocksession.newaction(venv.name, "getenv") as action:
         tox_testenv_install_deps(action=action, venv=venv)
