@@ -27,6 +27,30 @@ def test_conda_deps(tmpdir, newconfig):
     assert "something" == config.envconfigs["py1"].conda_deps[1].name
 
 
+def test_conda_env_and_spec(tmpdir, newconfig):
+    config = newconfig(
+        [],
+        """
+        [tox]
+        toxworkdir = {}
+        [testenv:py1]
+        conda_env = conda_env.yaml
+        conda_spec = conda_spec.txt
+    """.format(
+            tmpdir
+        ),
+    )
+
+    assert len(config.envconfigs) == 1
+    assert config.envconfigs["py1"].conda_env == tmpdir / "conda_env.yaml"
+    assert config.envconfigs["py1"].conda_spec == tmpdir / "conda_spec.txt"
+    # Conda env and spec files get added to deps to allow tox to detect changes. Similar to conda_deps.
+    assert hasattr(config.envconfigs["py1"], "deps")
+    assert len(config.envconfigs["py1"].deps) == 2
+    assert any(dep.name == tmpdir / "conda_env.yaml" for dep in config.envconfigs["py1"].deps)
+    assert any(dep.name == tmpdir / "conda_spec.txt" for dep in config.envconfigs["py1"].deps)
+
+
 def test_no_conda_deps(tmpdir, newconfig):
     config = newconfig(
         [],
