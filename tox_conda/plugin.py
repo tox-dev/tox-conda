@@ -246,14 +246,14 @@ def tox_testenv_install_deps(venv, action):
     num_conda_deps = len(venv.envconfig.conda_deps)
     if venv.envconfig.conda_spec is not None:
         num_conda_deps += 1
-    if venv.envconfig.conda_env is not None:
-        num_conda_deps += 1
 
     if num_conda_deps > 0:
         install_conda_deps(venv, action, venv.path.dirpath(), venv.envconfig.envdir)
         # Account for the fact that we added the conda_deps to the deps list in
         # tox_configure (see comment there for rationale). We don't want them
         # to be present when we call pip install.
+        if venv.envconfig.conda_env is not None:
+            num_conda_deps += 1
         venv.envconfig.deps = venv.envconfig.deps[: -1 * num_conda_deps]
 
     with activate_env(venv, action):
