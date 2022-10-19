@@ -255,7 +255,8 @@ def tox_testenv_install_deps(venv, action):
     # to be present when we call pip install.
     if venv.envconfig.conda_env is not None:
         num_conda_deps += 1
-    venv.envconfig.deps = venv.envconfig.deps[: -1 * num_conda_deps]
+    if num_conda_deps > 0:
+        venv.envconfig.deps = venv.envconfig.deps[:-num_conda_deps]
 
     with activate_env(venv, action):
         tox.venv.tox_testenv_install_deps(venv=venv, action=action)
