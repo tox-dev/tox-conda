@@ -1,7 +1,9 @@
 import io
 import os
 import re
+import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 import tox
 from ruamel.yaml import YAML
@@ -276,8 +278,20 @@ def test_conda_env(tmpdir, newconfig, mocksession):
     venv, action, pcalls = create_test_env(config, mocksession, "py123")
     assert venv.envconfig.conda_env
 
-    with mocksession.newaction(venv.name, "getenv") as action:
-        tox_testenv_create(action=action, venv=venv, _test_leave_tmp_env=True)
+    class TemporaryFileMock(tempfile._TemporaryFileWrapper):
+        def __exit__(self, exc_type, exc_value, traceback):
+            TemporaryFileMock.checked = True
+
+            yaml = YAML()
+            tmp_env = yaml.load(Path(self.name))
+            assert tmp_env["dependencies"][-1].startswith("python=")
+
+            super().__exit__(exc_type, exc_value, traceback)
+
+    with patch("tempfile._TemporaryFileWrapper", new=TemporaryFileMock) as mock_file:
+        with mocksession.newaction(venv.name, "getenv") as action:
+            tox_testenv_create(action=action, venv=venv)
+
     pcalls = mocksession._pcalls
     assert len(pcalls) >= 1
     call = pcalls[-1]
@@ -287,11 +301,7 @@ def test_conda_env(tmpdir, newconfig, mocksession):
     assert venv.path == call.args[4]
     assert call.args[5].startswith("--file")
     assert cmd[6].endswith(".yaml")
-
-    yaml = YAML()
-    tmp_env = yaml.load(Path(cmd[6]))
-    assert tmp_env["dependencies"][-1].startswith("python=")
-    os.unlink(cmd[6])
+    assert mock_file.checked
 
 
 def test_conda_env_and_spec(tmpdir, newconfig, mocksession):
@@ -329,8 +339,26 @@ def test_conda_env_and_spec(tmpdir, newconfig, mocksession):
     assert venv.envconfig.conda_env
     assert venv.envconfig.conda_spec
 
-    with mocksession.newaction(venv.name, "getenv") as action:
-        tox_testenv_create(action=action, venv=venv, _test_leave_tmp_env=True)
+    def check(x, y, z):
+        yaml = YAML()
+        tmp_env = yaml.load(Path(cmd[6]))
+        assert tmp_env["dependencies"][-1].startswith("python=")
+        os.unlink(cmd[6])
+
+    class TemporaryFileMock(tempfile._TemporaryFileWrapper):
+        def __exit__(self, exc_type, exc_value, traceback):
+            TemporaryFileMock.checked = True
+
+            yaml = YAML()
+            tmp_env = yaml.load(Path(self.name))
+            assert tmp_env["dependencies"][-1].startswith("python=")
+
+            super().__exit__(exc_type, exc_value, traceback)
+
+    with patch("tempfile._TemporaryFileWrapper", new=TemporaryFileMock) as mock_file:
+        with mocksession.newaction(venv.name, "getenv") as action:
+            tox_testenv_create(action=action, venv=venv)
+
     pcalls = mocksession._pcalls
     assert len(pcalls) >= 1
     call = pcalls[-1]
@@ -340,11 +368,7 @@ def test_conda_env_and_spec(tmpdir, newconfig, mocksession):
     assert venv.path == call.args[4]
     assert call.args[5].startswith("--file")
     assert cmd[6].endswith(".yaml")
-
-    yaml = YAML()
-    tmp_env = yaml.load(Path(cmd[6]))
-    assert tmp_env["dependencies"][-1].startswith("python=")
-    os.unlink(cmd[6])
+    assert mock_file.checked
 
     with mocksession.newaction(venv.name, "getenv") as action:
         tox_testenv_install_deps(action=action, venv=venv)
