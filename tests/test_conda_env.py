@@ -282,6 +282,10 @@ def test_conda_env(tmpdir, newconfig, mocksession):
         def __exit__(self, exc_type, exc_value, traceback):
             TemporaryFileMock.checked = True
 
+            # We need to close the file before we can open it again in reading mode, or we will
+            # get permission denied on Windows
+            self.file.__exit__(exc_type, exc_value, traceback)
+
             yaml = YAML()
             tmp_env = yaml.load(Path(self.name))
             assert tmp_env["dependencies"][-1].startswith("python=")
@@ -348,6 +352,10 @@ def test_conda_env_and_spec(tmpdir, newconfig, mocksession):
     class TemporaryFileMock(tempfile._TemporaryFileWrapper):
         def __exit__(self, exc_type, exc_value, traceback):
             TemporaryFileMock.checked = True
+
+            # We need to close the file before we can open it again in reading mode, or we will
+            # get permission denied on Windows
+            self.file.__exit__(exc_type, exc_value, traceback)
 
             yaml = YAML()
             tmp_env = yaml.load(Path(self.name))
