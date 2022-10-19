@@ -151,7 +151,7 @@ def _run_conda_process(args, venv, action, cwd):
 
 
 @hookimpl
-def tox_testenv_create(venv, action, _test_leave_tmp_env=False):
+def tox_testenv_create(venv, action):
     tox.venv.cleanup_for_venv(venv)
     basepath = venv.path.dirpath()
 
@@ -167,22 +167,20 @@ def tox_testenv_create(venv, action, _test_leave_tmp_env=False):
         env_file = yaml.load(Path(venv.envconfig.conda_env))
         env_file["dependencies"].append(python)
 
-        with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False) as tmp_env:
+        with tempfile.NamedTemporaryFile(suffix=".yaml") as tmp_env:
             yaml.dump(env_file, tmp_env)
 
-        args = [
-            venv.envconfig.conda_exe,
-            "env",
-            "create",
-            "-p",
-            envdir,
-            "--file",
-            tmp_env.name,
-        ]
+            args = [
+                venv.envconfig.conda_exe,
+                "env",
+                "create",
+                "-p",
+                envdir,
+                "--file",
+                tmp_env.name,
+            ]
 
-        _run_conda_process(args, venv, action, basepath)
-        if not _test_leave_tmp_env:
-            os.unlink(tmp_env.name)
+            _run_conda_process(args, venv, action, basepath)
     else:
         args = [venv.envconfig.conda_exe, "create", "--yes", "-p", envdir]
         for channel in venv.envconfig.conda_channels:
