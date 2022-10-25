@@ -1,9 +1,7 @@
 import io
 import os
 import re
-import tempfile
-from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import mock_open, patch
 
 import tox
 from ruamel.yaml import YAML
@@ -278,21 +276,8 @@ def test_conda_env(tmpdir, newconfig, mocksession):
     venv, action, pcalls = create_test_env(config, mocksession, "py123")
     assert venv.envconfig.conda_env
 
-    class TemporaryFileMock(tempfile._TemporaryFileWrapper):
-        def __exit__(self, exc_type, exc_value, traceback):
-            TemporaryFileMock.checked = True
-
-            # We need to close the file before we can open it again in reading mode, or we will
-            # get permission denied on Windows
-            self.file.__exit__(exc_type, exc_value, traceback)
-
-            yaml = YAML()
-            tmp_env = yaml.load(Path(self.name))
-            assert tmp_env["dependencies"][-1].startswith("python=")
-
-            super().__exit__(exc_type, exc_value, traceback)
-
-    with patch("tempfile._TemporaryFileWrapper", new=TemporaryFileMock) as mock_file:
+    mock_file = mock_open()
+    with patch("tox_conda.plugin.tempfile.NamedTemporaryFile", mock_file):
         with mocksession.newaction(venv.name, "getenv") as action:
             tox_testenv_create(action=action, venv=venv)
 
@@ -304,8 +289,13 @@ def test_conda_env(tmpdir, newconfig, mocksession):
     assert cmd[1:4] == ["env", "create", "-p"]
     assert venv.path == call.args[4]
     assert call.args[5].startswith("--file")
-    assert cmd[6].endswith(".yaml")
-    assert mock_file.checked
+    assert cmd[6] == str(mock_file().name)
+
+    mock_file.assert_any_call(suffix=".yaml")
+
+    yaml = YAML()
+    tmp_env = yaml.load(mock_open_to_string(mock_file))
+    assert tmp_env["dependencies"][-1].startswith("python=")
 
 
 def test_conda_env_and_spec(tmpdir, newconfig, mocksession):
@@ -343,27 +333,8 @@ def test_conda_env_and_spec(tmpdir, newconfig, mocksession):
     assert venv.envconfig.conda_env
     assert venv.envconfig.conda_spec
 
-    def check(x, y, z):
-        yaml = YAML()
-        tmp_env = yaml.load(Path(cmd[6]))
-        assert tmp_env["dependencies"][-1].startswith("python=")
-        os.unlink(cmd[6])
-
-    class TemporaryFileMock(tempfile._TemporaryFileWrapper):
-        def __exit__(self, exc_type, exc_value, traceback):
-            TemporaryFileMock.checked = True
-
-            # We need to close the file before we can open it again in reading mode, or we will
-            # get permission denied on Windows
-            self.file.__exit__(exc_type, exc_value, traceback)
-
-            yaml = YAML()
-            tmp_env = yaml.load(Path(self.name))
-            assert tmp_env["dependencies"][-1].startswith("python=")
-
-            super().__exit__(exc_type, exc_value, traceback)
-
-    with patch("tempfile._TemporaryFileWrapper", new=TemporaryFileMock) as mock_file:
+    mock_file = mock_open()
+    with patch("tox_conda.plugin.tempfile.NamedTemporaryFile", mock_file):
         with mocksession.newaction(venv.name, "getenv") as action:
             tox_testenv_create(action=action, venv=venv)
 
@@ -375,8 +346,13 @@ def test_conda_env_and_spec(tmpdir, newconfig, mocksession):
     assert cmd[1:4] == ["env", "create", "-p"]
     assert venv.path == call.args[4]
     assert call.args[5].startswith("--file")
-    assert cmd[6].endswith(".yaml")
-    assert mock_file.checked
+    assert cmd[6] == str(mock_file().name)
+
+    mock_file.assert_any_call(suffix=".yaml")
+
+    yaml = YAML()
+    tmp_env = yaml.load(mock_open_to_string(mock_file))
+    assert tmp_env["dependencies"][-1].startswith("python=")
 
     with mocksession.newaction(venv.name, "getenv") as action:
         tox_testenv_install_deps(action=action, venv=venv)
@@ -472,3 +448,7 @@ def test_verbosity(newconfig, mocksession):
     assert "conda" in call.args[0]
     assert "install" == call.args[1]
     assert not isinstance(call.stdout, io.IOBase)
+
+
+def mock_open_to_string(mock):
+    return "".join(call.args[0] for call in mock().write.call_args_list)
