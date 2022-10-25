@@ -122,10 +122,12 @@ section of configuration files:
 
 * ``conda_env``, which specifies a ``conda-env.yml`` file to create a base conda
   environment for the test. The ``conda-env.yml`` file is self-contained and
-  if the desired python version and conda channels to use is not given, the latest
-  python version (if needed) and default channels will be used. The above ``conda_deps``,
-  ``conda_channels``, and ``conda_spec`` arguments, if used in conjunction with
-  a ``conda-env.yml`` file, will be used to *update* the environment *after* the
+  if the desired conda channels to use are not given, the default channels will be used.
+  If the ``conda-env.yml`` specifies a python version it must be compatible with the ``basepython``
+  set for the tox env. A ``conda-env.yml`` specifying ``python>=3.8`` could for example be
+  used with ``basepython`` set to ``py38``, ``py39`` or ``py310``.
+  The above ``conda_deps``, ``conda_channels``, and ``conda_spec`` arguments, if used in
+  conjunction with a ``conda-env.yml`` file, will be used to *update* the environment *after* the
   initial environment creation.
 
 * ``conda_create_args``, which is used to pass arguments to the command ``conda create``.
