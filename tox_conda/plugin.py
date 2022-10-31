@@ -160,14 +160,17 @@ def tox_testenv_create(venv, action):
     python = get_py_version(venv.envconfig, action)
 
     if venv.envconfig.conda_env is not None:
+        env_path = Path(venv.envconfig.conda_env)
         # conda env create does not have a --channel argument nor does it take
         # dependencies specifications (e.g., python=3.8). These must all be specified
         # in the conda-env.yml file
         yaml = YAML()
-        env_file = yaml.load(Path(venv.envconfig.conda_env))
+        env_file = yaml.load(env_path)
         env_file["dependencies"].append(python)
 
-        with tempfile.NamedTemporaryFile(suffix=".yaml") as tmp_env:
+        with tempfile.NamedTemporaryFile(
+            dir=env_path.parent, prefix="tox_conda_tmp", suffix=".yaml"
+        ) as tmp_env:
             yaml.dump(env_file, tmp_env)
 
             args = [
