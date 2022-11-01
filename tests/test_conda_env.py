@@ -281,6 +281,8 @@ def test_conda_env(tmpdir, newconfig, mocksession):
         with mocksession.newaction(venv.name, "getenv") as action:
             tox_testenv_create(action=action, venv=venv)
 
+    mock_file.assert_called_with(dir=tmpdir, prefix="tox_conda_tmp", suffix=".yaml")
+
     pcalls = mocksession._pcalls
     assert len(pcalls) >= 1
     call = pcalls[-1]
@@ -290,8 +292,6 @@ def test_conda_env(tmpdir, newconfig, mocksession):
     assert venv.path == call.args[4]
     assert call.args[5].startswith("--file")
     assert cmd[6] == str(mock_file().name)
-
-    mock_file.assert_any_call(suffix=".yaml")
 
     yaml = YAML()
     tmp_env = yaml.load(mock_open_to_string(mock_file))
@@ -338,6 +338,8 @@ def test_conda_env_and_spec(tmpdir, newconfig, mocksession):
         with mocksession.newaction(venv.name, "getenv") as action:
             tox_testenv_create(action=action, venv=venv)
 
+    mock_file.assert_called_with(dir=tmpdir, prefix="tox_conda_tmp", suffix=".yaml")
+
     pcalls = mocksession._pcalls
     assert len(pcalls) >= 1
     call = pcalls[-1]
@@ -347,8 +349,6 @@ def test_conda_env_and_spec(tmpdir, newconfig, mocksession):
     assert venv.path == call.args[4]
     assert call.args[5].startswith("--file")
     assert cmd[6] == str(mock_file().name)
-
-    mock_file.assert_any_call(suffix=".yaml")
 
     yaml = YAML()
     tmp_env = yaml.load(mock_open_to_string(mock_file))
