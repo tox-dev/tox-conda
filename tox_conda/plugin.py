@@ -169,7 +169,10 @@ def tox_testenv_create(venv, action):
         env_file["dependencies"].append(python)
 
         tmp_env = tempfile.NamedTemporaryFile(
-            dir=env_path.parent, prefix="tox_conda_tmp", suffix=".yaml", delete=False,
+            dir=env_path.parent,
+            prefix="tox_conda_tmp",
+            suffix=".yaml",
+            delete=False,
         )
         yaml.dump(env_file, tmp_env)
 
@@ -185,7 +188,7 @@ def tox_testenv_create(venv, action):
         tmp_env.close()
         _run_conda_process(args, venv, action, basepath)
         Path(tmp_env.name).unlink()
-        
+
     else:
         args = [venv.envconfig.conda_exe, "create", "--yes", "-p", envdir]
         for channel in venv.envconfig.conda_channels:
