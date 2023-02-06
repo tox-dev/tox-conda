@@ -1,7 +1,7 @@
 import io
 import os
-import re
 import pathlib
+import re
 from unittest.mock import mock_open, patch
 
 import tox
