@@ -5,24 +5,264 @@ import shutil
 import subprocess
 import tempfile
 from pathlib import Path
+from functools import partial
 
-import pluggy
-import py.path
-import tox
-from ruamel.yaml import YAML
-from tox.config import DepConfig, DepOption, TestenvConfig
-from tox.venv import VirtualEnv
-
-from .env_activator import activate_env
-
-hookimpl = pluggy.HookimplMarker("tox")
 
 MISSING_CONDA_ERROR = "Cannot locate the conda executable."
 
 
-class CondaDepOption(DepOption):
-    name = "conda_deps"
-    help = "each line specifies a conda dependency in pip/setuptools format"
+import json
+import os
+import re
+import shlex
+import shutil
+import subprocess
+from io import BytesIO, TextIOWrapper
+from pathlib import Path
+from time import sleep
+from typing import Any, Dict, List
+
+from tox.execute.api import (
+    Execute,
+    ExecuteInstance,
+    ExecuteOptions,
+    ExecuteRequest,
+    SyncWrite,
+)
+from tox.execute.local_sub_process import (
+    LocalSubProcessExecuteInstance,
+    LocalSubProcessExecutor,
+)
+from tox.plugin import impl
+from tox.plugin.spec import EnvConfigSet, State, ToxEnvRegister, ToxParser
+from tox.tox_env.api import StdinSource, ToxEnv, ToxEnvCreateArgs
+from tox.tox_env.errors import Fail
+from tox.tox_env.installer import Installer
+from tox.tox_env.python.pip.pip_install import Pip
+from tox.tox_env.python.virtual_env.runner import VirtualEnvRunner
+from tox.tox_env.python.pip.req_file import PythonDeps
+
+
+class CondaEnvRunner(VirtualEnvRunner):
+    def __init__(self, create_args: ToxEnvCreateArgs) -> None:
+        self._installer = None
+        self._executor = None
+        self._created = False
+        super().__init__(create_args)
+
+    @staticmethod
+    def id() -> str:  # noqa A003
+        return "conda"
+
+    def _get_python_env_version(self):
+        # Try to use base_python config
+        match = re.match(
+            r"python(\d)(?:\.(\d+))?(?:\.?(\d))?", self.conf["base_python"][0]
+        )
+        if match:
+            groups = match.groups()
+            version = groups[0]
+            if groups[1]:
+                version += ".{}".format(groups[1])
+            if groups[2]:
+                version += ".{}".format(groups[2])
+            return version
+        else:
+            return self.base_python.version_dot
+
+    @staticmethod
+    def _find_conda() -> Path:
+        # This should work if we're not already in an environment
+        conda_exe = os.environ.get("_CONDA_EXE")
+        if conda_exe:
+            return Path(conda_exe).resolve()
+
+        # This should work if we're in an active environment
+        conda_exe = os.environ.get("CONDA_EXE")
+        if conda_exe:
+            return Path(conda_exe).resolve()
+
+        conda_exe = shutil.which("conda")
+        if conda_exe:
+            return Path(conda_exe).resolve()
+
+        raise Fail("Failed to find 'conda' executable.")
+
+    def create_python_env(self) -> None:
+        conda_exe = CondaEnvRunner._find_conda()
+        python_version = self._get_python_env_version()
+
+        conf = self.python_cache()
+
+        cmd = f"'{conda_exe}' create {conf['conda_env_spec']} '{conf['conda_env']}' python={python_version} --yes --quiet"
+        try:
+            cmd_list = shlex.split(cmd)
+            subprocess.run(cmd_list, check=True)
+        except subprocess.CalledProcessError as e:
+            raise Fail(
+                f"Failed to create '{self.env_dir}' conda environment. Error: {e}"
+            )
+
+    def python_cache(self) -> Dict[str, Any]:
+        base = super().python_cache()
+
+        conda_name = getattr(self.options, "conda_name", None)
+        if not conda_name and "conda_name" in self.conf:
+            conda_name = self.conf["conda_name"]
+
+        if conda_name:
+            conda_env_spec = "-n"
+            conda_env = conda_name
+        else:
+            conda_env_spec = "-p"
+            conda_env = f"{self.env_dir}"
+
+        base.update(
+            {"conda_env_spec": conda_env_spec, "conda_env": conda_env},
+        )
+        return base
+
+    def _ensure_python_env_exists(self) -> None:
+        if not Path(self.env_dir).exists():
+            self.create_python_env()
+            self._created = True
+            return
+
+        if self._created:
+            return
+
+        conda_exe = CondaEnvRunner._find_conda()
+        cmd = f"'{conda_exe}' env list --json"
+        try:
+            cmd_list = shlex.split(cmd)
+            result: subprocess.CompletedProcess = subprocess.run(
+                cmd_list, check=True, capture_output=True
+            )
+        except subprocess.CalledProcessError as e:
+            raise Fail(f"Failed to list conda environments. Error: {e}")
+        envs = json.loads(result.stdout.decode())
+        if str(self.env_dir) in envs["envs"]:
+            self._created = True
+        else:
+            raise Fail(
+                f"{self.env_dir} already exists, but it is not a conda environment. Delete in manually first."
+            )
+
+    def env_site_package_dir(self) -> Path:
+        """The site package folder withinn the tox environment."""
+        cmd = 'from sysconfig import get_paths; print(get_paths()["purelib"])'
+        path = self._call_python_in_conda_env(cmd, "env_site_package_dir")
+        return Path(path).resolve()
+
+    def env_python(self) -> Path:
+        """The python executable within the tox environment."""
+        cmd = "import sys; print(sys.executable)"
+        path = self._call_python_in_conda_env(cmd, "env_python")
+        return Path(path).resolve()
+
+    def env_bin_dir(self) -> Path:
+        """The binary folder within the tox environment."""
+        cmd = 'from sysconfig import get_paths; print(get_paths()["scripts"])'
+        path = self._call_python_in_conda_env(cmd, "env_bin_dir")
+        return Path(path).resolve()
+
+    @property
+    def executor(self) -> Execute:
+        def create_conda_command_prefix():
+            conf = self.python_cache()
+            return [
+                "conda",
+                "run",
+                conf["conda_env_spec"],
+                conf["conda_env"],
+                "--live-stream",
+            ]
+
+        class CondaExecutor(LocalSubProcessExecutor):
+            def build_instance(
+                self,
+                request: ExecuteRequest,
+                options: ExecuteOptions,
+                out: SyncWrite,
+                err: SyncWrite,
+            ) -> ExecuteInstance:
+                conda_cmd = create_conda_command_prefix()
+
+                conda_request = ExecuteRequest(
+                    conda_cmd + request.cmd,
+                    request.cwd,
+                    request.env,
+                    request.stdin,
+                    request.run_id,
+                    request.allow,
+                )
+                return LocalSubProcessExecuteInstance(conda_request, options, out, err)
+
+        if self._executor is None:
+            self._executor = CondaExecutor(self.options.is_colored)
+        return self._executor
+
+    def _call_python_in_conda_env(self, cmd: str, run_id: str):
+        self._ensure_python_env_exists()
+
+        python_cmd = "python -c".split()
+
+        class NamedBytesIO(BytesIO):
+            def __init__(self, name):
+                self.name = name
+                super().__init__()
+
+        out_buffer = NamedBytesIO("output")
+        out = TextIOWrapper(out_buffer, encoding="utf-8")
+
+        err_buffer = NamedBytesIO("error")
+        err = TextIOWrapper(err_buffer, encoding="utf-8")
+
+        out_err = out, err
+
+        request = ExecuteRequest(
+            python_cmd + [cmd],
+            self.conf["change_dir"],
+            self.environment_variables,
+            StdinSource.API,
+            run_id,
+        )
+
+        with self.executor.call(request, True, out_err, self) as execute_status:
+            while execute_status.wait() is None:
+                sleep(0.01)
+            if execute_status.exit_code != 0:
+                raise Fail(
+                    f"Failed to execute operation '{cmd}'. Stderr: {execute_status.err.decode()}"
+                )
+
+        return execute_status.out.decode().strip()
+
+    @property
+    def installer(self) -> Installer[Any]:
+        if self._installer is None:
+            self._installer = Pip(self)
+        return self._installer
+
+    def prepend_env_var_path(self) -> List[Path]:
+        conda_exe: Path = CondaEnvRunner._find_conda()
+        return [conda_exe.parent]
+
+    def _default_pass_env(self) -> List[str]:
+        env = super()._default_pass_env()
+        env.append("*CONDA*")
+        return env
+
+
+@impl
+def tox_register_tox_env(register: ToxEnvRegister) -> None:  # noqa: U100
+    register.add_run_env(CondaEnvRunner)
+    try:
+        CondaEnvRunner._find_conda()
+        if "CONDA_DEFAULT_ENV" in os.environ:
+            register.default_env_runner = "conda"
+    except Fail:
+        pass
 
 
 def postprocess_path_option(testenv_config, value):
@@ -55,41 +295,50 @@ def get_py_version(envconfig, action):
     return "python={}".format(version)
 
 
-@hookimpl
-def tox_addoption(parser):
-    parser.add_testenv_attribute(
-        name="conda_env",
-        type="path",
-        help="specify a conda environment.yml file",
-        postprocess=postprocess_path_option,
+@impl
+def tox_add_env_config(env_conf: EnvConfigSet, state: State) -> None:
+    env_conf.add_config(
+        "conda_env",
+        of_type="path",
+        desc="specify a conda environment.yml file",
+        default=None,
+        post_process=postprocess_path_option,
     )
-    parser.add_testenv_attribute(
-        name="conda_spec",
-        type="path",
-        help="specify a conda spec-file.txt file",
-        postprocess=postprocess_path_option,
-    )
-
-    parser.add_testenv_attribute_obj(CondaDepOption())
-
-    parser.add_testenv_attribute(
-        name="conda_channels", type="line-list", help="each line specifies a conda channel"
+    env_conf.add_config(
+        "conda_spec",
+        of_type="path",
+        desc="specify a conda spec-file.txt file",
+        default=None,
+        post_process=postprocess_path_option,
     )
 
-    parser.add_testenv_attribute(
-        name="conda_install_args",
-        type="line-list",
-        help="each line specifies a conda install argument",
+    root = env_conf._conf.core["tox_root"]
+    env_conf.add_config(
+        "conda_deps",
+        of_type=PythonDeps,
+        factory=partial(PythonDeps.factory, root),
+        default=PythonDeps("", root),
+        desc="each line specifies a conda dependency in pip/setuptools format",
     )
 
-    parser.add_testenv_attribute(
-        name="conda_create_args",
-        type="line-list",
-        help="each line specifies a conda create argument",
+    env_conf.add_config(
+        "conda_channels", of_type="line-list", desc="each line specifies a conda channel", default=None,
+    )
+
+    env_conf.add_config(
+        "conda_install_args",
+        of_type="line-list",
+        desc="each line specifies a conda install argument",default=None,
+    )
+
+    env_conf.add_config(
+        "conda_create_args",
+        of_type="line-list",
+        desc="each line specifies a conda create argument",default=None,
     )
 
 
-@hookimpl
+# @hookimpl
 def tox_configure(config):
     # This is a pretty cheesy workaround. It allows tox to consider changes to
     # the conda dependencies when it decides whether an existing environment
@@ -150,7 +399,7 @@ def _run_conda_process(args, venv, action, cwd):
     venv._pcall(args, venv=False, action=action, cwd=cwd, redirect=redirect)
 
 
-@hookimpl
+# @hookimpl
 def tox_testenv_create(venv, action):
     tox.venv.cleanup_for_venv(venv)
     basepath = venv.path.dirpath()
@@ -244,7 +493,7 @@ def install_conda_deps(venv, action, basepath, envdir):
     _run_conda_process(args, venv, action, basepath)
 
 
-@hookimpl
+# @hookimpl
 def tox_testenv_install_deps(venv, action):
     # Save the deps before we make temporary changes.
     saved_deps = copy.deepcopy(venv.envconfig.deps)
@@ -273,7 +522,7 @@ def tox_testenv_install_deps(venv, action):
     return True
 
 
-@hookimpl
+# @hookimpl
 def tox_get_python_executable(envconfig):
     if tox.INFO.IS_WIN:
         path = envconfig.envdir.join("python.exe")
@@ -293,8 +542,8 @@ def get_envpython(self):
         return self.envdir.join("python")
 
 
-TestenvConfig.__get_envpython = TestenvConfig.get_envpython
-TestenvConfig.get_envpython = get_envpython
+# TestenvConfig.__get_envpython = TestenvConfig.get_envpython
+# TestenvConfig.get_envpython = get_envpython
 
 
 # Monkey patch TestenvConfig _venv_lookup to fix tox behavior with tox-conda under windows
@@ -310,23 +559,23 @@ def venv_lookup(self, name):
     return py.path.local.sysfind(name, paths=paths)
 
 
-VirtualEnv._venv_lookup = venv_lookup
+# VirtualEnv._venv_lookup = venv_lookup
 
 
-@hookimpl(hookwrapper=True)
+# @hookimpl(hookwrapper=True)
 def tox_runtest_pre(venv):
     with activate_env(venv):
         yield
 
 
-@hookimpl
+# @hookimpl
 def tox_runtest(venv, redirect):
     with activate_env(venv):
         tox.venv.tox_runtest(venv, redirect)
     return True
 
 
-@hookimpl(hookwrapper=True)
+# @hookimpl(hookwrapper=True)
 def tox_runtest_post(venv):
     with activate_env(venv):
         yield
