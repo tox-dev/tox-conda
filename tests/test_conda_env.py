@@ -1,5 +1,6 @@
 import io
 import os
+import pathlib
 import re
 from unittest.mock import mock_open, patch
 
@@ -278,10 +279,12 @@ def test_conda_env(tmpdir, newconfig, mocksession):
 
     mock_file = mock_open()
     with patch("tox_conda.plugin.tempfile.NamedTemporaryFile", mock_file):
-        with mocksession.newaction(venv.name, "getenv") as action:
-            tox_testenv_create(action=action, venv=venv)
+        with patch.object(pathlib.Path, "unlink", autospec=True) as mock_unlink:
+            with mocksession.newaction(venv.name, "getenv") as action:
+                tox_testenv_create(action=action, venv=venv)
+                mock_unlink.assert_called_once
 
-    mock_file.assert_called_with(dir=tmpdir, prefix="tox_conda_tmp", suffix=".yaml")
+    mock_file.assert_called_with(dir=tmpdir, prefix="tox_conda_tmp", suffix=".yaml", delete=False)
 
     pcalls = mocksession._pcalls
     assert len(pcalls) >= 1
@@ -335,10 +338,12 @@ def test_conda_env_and_spec(tmpdir, newconfig, mocksession):
 
     mock_file = mock_open()
     with patch("tox_conda.plugin.tempfile.NamedTemporaryFile", mock_file):
-        with mocksession.newaction(venv.name, "getenv") as action:
-            tox_testenv_create(action=action, venv=venv)
+        with patch.object(pathlib.Path, "unlink", autospec=True) as mock_unlink:
+            with mocksession.newaction(venv.name, "getenv") as action:
+                tox_testenv_create(action=action, venv=venv)
+                mock_unlink.assert_called_once
 
-    mock_file.assert_called_with(dir=tmpdir, prefix="tox_conda_tmp", suffix=".yaml")
+    mock_file.assert_called_with(dir=tmpdir, prefix="tox_conda_tmp", suffix=".yaml", delete=False)
 
     pcalls = mocksession._pcalls
     assert len(pcalls) >= 1
