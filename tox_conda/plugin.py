@@ -6,6 +6,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 from functools import partial
+import hashlib
 
 
 MISSING_CONDA_ERROR = "Cannot locate the conda executable."
@@ -41,6 +42,8 @@ from tox.tox_env.installer import Installer
 from tox.tox_env.python.pip.pip_install import Pip
 from tox.tox_env.python.virtual_env.runner import VirtualEnvRunner
 from tox.tox_env.python.pip.req_file import PythonDeps
+
+from ruamel.yaml import YAML
 
 
 __all__ = []
@@ -79,8 +82,8 @@ class CondaEnvRunner(VirtualEnvRunner):
 
         cache_conf = self.python_cache()
 
-        if "conda_env" in self.conf:
-            env_path = Path(self.conf["conda_env"])
+        if self.conf["conda_env"]:
+            env_path = Path(self.conf["conda_env"]).resolve()
             # conda env create does not have a --channel argument nor does it take
             # dependencies specifications (e.g., python=3.8). These must all be specified
             # in the conda-env.yml file
@@ -88,20 +91,20 @@ class CondaEnvRunner(VirtualEnvRunner):
             env_file = yaml.load(env_path)
             env_file["dependencies"].append(python)
 
-            tmp_env = tempfile.NamedTemporaryFile(
+            tmp_env_file = tempfile.NamedTemporaryFile(
                 dir=env_path.parent,
                 prefix="tox_conda_tmp",
                 suffix=".yaml",
                 delete=False,
             )
-            yaml.dump(env_file, tmp_env)
-            tmp_env.close()
+            yaml.dump(env_file, tmp_env_file)
+            tmp_env_file.close()
 
-            cmd = f"'{conda_exe}' create {cache_conf['conda_env_spec']} '{cache_conf['conda_env']}' --yes --quiet --file {tmp_env.name}"
-            tear_down = lambda: Path(tmp_env.name).unlink()
+            cmd = f"'{conda_exe}' env create --file '{tmp_env_file.name}' --quiet --force"
+            tear_down = lambda: Path(tmp_env_file.name).unlink()
         else:
             cmd = f"'{conda_exe}' create {cache_conf['conda_env_spec']} '{cache_conf['conda_env']}' {python} --yes --quiet"
-
+            tear_down = lambda: None
         try:
             cmd_list = shlex.split(cmd)
             subprocess.run(cmd_list, check=True)
@@ -110,25 +113,32 @@ class CondaEnvRunner(VirtualEnvRunner):
                 f"Failed to create '{self.env_dir}' conda environment. Error: {e}"
             )
         finally:
-            if tear_down:
-                tear_down()
+            tear_down()
 
     def python_cache(self) -> Dict[str, Any]:
         base = super().python_cache()
 
         conda_name = getattr(self.options, "conda_name", None)
-        if not conda_name and "conda_name" in self.conf:
+        if not conda_name:
             conda_name = self.conf["conda_name"]
 
         if conda_name:
             conda_env_spec = "-n"
             conda_env = conda_name
+            conda_hash = ""
+        elif self.conf["conda_env"]:
+            conda_env_spec = f"-n"
+            env_path = Path(self.conf["conda_env"]).resolve()
+            env_file = YAML().load(env_path)
+            conda_env = env_file["name"]
+            conda_hash = hash_file(Path(self.conf["conda_env"]).resolve())
         else:
             conda_env_spec = "-p"
             conda_env = f"{self.env_dir}"
+            conda_hash = ""
 
         base.update(
-            {"conda_env_spec": conda_env_spec, "conda_env": conda_env},
+            {"conda_env_spec": conda_env_spec, "conda_env": conda_env, "conda_hash": conda_hash},
         )
         return base
 
@@ -276,7 +286,7 @@ def tox_register_tox_env(register: ToxEnvRegister) -> None:  # noqa: U100
         pass
 
 
-def postprocess_path_option(testenv_config, value):
+def postprocess_path_option(*args, **kwargs):
     if value == testenv_config.config.toxinidir:
         return None
     return value
@@ -293,12 +303,12 @@ def tox_add_env_config(env_conf: EnvConfigSet, state: State) -> None:
 
     env_conf.add_config(
         "conda_env",
-        of_type="path",
+        of_type=str,
         desc="specify a conda environment.yml file",
         default=None,
-        post_process=postprocess_path_option,
+        # post_process=postprocess_path_option,
     )
-    
+
     env_conf.add_config(
         "conda_spec",
         of_type="path",
@@ -382,6 +392,12 @@ def find_conda() -> Path:
 
     raise Fail("Failed to find 'conda' executable.")
 
+
+def hash_file(file: Path) -> str:
+    with open(file.name, 'rb') as f:
+        sha1 = hashlib.sha1()
+        sha1.update(f.read())
+        return sha1.hexdigest()
 
 def _run_conda_process(args, venv, action, cwd):
     redirect = tox.reporter.verbosity() < tox.reporter.Verbosity.DEBUG
