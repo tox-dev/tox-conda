@@ -75,10 +75,33 @@ class CondaEnvRunner(VirtualEnvRunner):
     def create_python_env(self) -> None:
         conda_exe = find_conda()
         python_version = self._get_python_env_version()
+        python = f"python={python_version}"
 
-        conf = self.python_cache()
+        cache_conf = self.python_cache()
 
-        cmd = f"'{conda_exe}' create {conf['conda_env_spec']} '{conf['conda_env']}' python={python_version} --yes --quiet"
+        if "conda_env" in self.conf:
+            env_path = Path(self.conf["conda_env"])
+            # conda env create does not have a --channel argument nor does it take
+            # dependencies specifications (e.g., python=3.8). These must all be specified
+            # in the conda-env.yml file
+            yaml = YAML()
+            env_file = yaml.load(env_path)
+            env_file["dependencies"].append(python)
+
+            tmp_env = tempfile.NamedTemporaryFile(
+                dir=env_path.parent,
+                prefix="tox_conda_tmp",
+                suffix=".yaml",
+                delete=False,
+            )
+            yaml.dump(env_file, tmp_env)
+            tmp_env.close()
+
+            cmd = f"'{conda_exe}' create {cache_conf['conda_env_spec']} '{cache_conf['conda_env']}' --yes --quiet --file {tmp_env.name}"
+            tear_down = lambda: Path(tmp_env.name).unlink()
+        else:
+            cmd = f"'{conda_exe}' create {cache_conf['conda_env_spec']} '{cache_conf['conda_env']}' {python} --yes --quiet"
+
         try:
             cmd_list = shlex.split(cmd)
             subprocess.run(cmd_list, check=True)
@@ -86,6 +109,9 @@ class CondaEnvRunner(VirtualEnvRunner):
             raise Fail(
                 f"Failed to create '{self.env_dir}' conda environment. Error: {e}"
             )
+        finally:
+            if tear_down:
+                tear_down()
 
     def python_cache(self) -> Dict[str, Any]:
         base = super().python_cache()
@@ -108,7 +134,7 @@ class CondaEnvRunner(VirtualEnvRunner):
 
     @property
     def executor(self) -> Execute:
-        def create_conda_command_prefix():
+        def get_conda_command_prefix():
             conf = self.python_cache()
             return [
                 "conda",
@@ -126,7 +152,7 @@ class CondaEnvRunner(VirtualEnvRunner):
                 out: SyncWrite,
                 err: SyncWrite,
             ) -> ExecuteInstance:
-                conda_cmd = create_conda_command_prefix()
+                conda_cmd = get_conda_command_prefix()
 
                 conda_request = ExecuteRequest(
                     conda_cmd + request.cmd,
@@ -259,12 +285,20 @@ def postprocess_path_option(testenv_config, value):
 @impl
 def tox_add_env_config(env_conf: EnvConfigSet, state: State) -> None:
     env_conf.add_config(
+        "conda_name",
+        of_type=str,
+        desc="Specifies the name of the conda environment. By default, .tox/<name> is used.",
+        default=None
+    )
+
+    env_conf.add_config(
         "conda_env",
         of_type="path",
         desc="specify a conda environment.yml file",
         default=None,
         post_process=postprocess_path_option,
     )
+    
     env_conf.add_config(
         "conda_spec",
         of_type="path",
