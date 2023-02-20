@@ -106,50 +106,6 @@ class CondaEnvRunner(VirtualEnvRunner):
         )
         return base
 
-    def _ensure_python_env_exists(self) -> None:
-        if not Path(self.env_dir).exists():
-            self.create_python_env()
-            self._created = True
-            return
-
-        if self._created:
-            return
-
-        conda_exe = find_conda()
-        cmd = f"'{conda_exe}' env list --json"
-        try:
-            cmd_list = shlex.split(cmd)
-            result: subprocess.CompletedProcess = subprocess.run(
-                cmd_list, check=True, capture_output=True
-            )
-        except subprocess.CalledProcessError as e:
-            raise Fail(f"Failed to list conda environments. Error: {e}")
-        envs = json.loads(result.stdout.decode())
-        if str(self.env_dir) in envs["envs"]:
-            self._created = True
-        else:
-            raise Fail(
-                f"{self.env_dir} already exists, but it is not a conda environment. Delete in manually first."
-            )
-
-    def env_site_package_dir(self) -> Path:
-        """The site package folder withinn the tox environment."""
-        cmd = 'from sysconfig import get_paths; print(get_paths()["purelib"])'
-        path = self._call_python_in_conda_env(cmd, "env_site_package_dir")
-        return Path(path).resolve()
-
-    def env_python(self) -> Path:
-        """The python executable within the tox environment."""
-        cmd = "import sys; print(sys.executable)"
-        path = self._call_python_in_conda_env(cmd, "env_python")
-        return Path(path).resolve()
-
-    def env_bin_dir(self) -> Path:
-        """The binary folder within the tox environment."""
-        cmd = 'from sysconfig import get_paths; print(get_paths()["scripts"])'
-        path = self._call_python_in_conda_env(cmd, "env_bin_dir")
-        return Path(path).resolve()
-
     @property
     def executor(self) -> Execute:
         def create_conda_command_prefix():
@@ -185,6 +141,39 @@ class CondaEnvRunner(VirtualEnvRunner):
         if self._executor is None:
             self._executor = CondaExecutor(self.options.is_colored)
         return self._executor
+
+    @property
+    def installer(self) -> Installer[Any]:
+        if self._installer is None:
+            self._installer = Pip(self)
+        return self._installer
+
+    def prepend_env_var_path(self) -> List[Path]:
+        conda_exe: Path = find_conda()
+        return [conda_exe.parent]
+
+    def _default_pass_env(self) -> List[str]:
+        env = super()._default_pass_env()
+        env.append("*CONDA*")
+        return env
+    
+    def env_site_package_dir(self) -> Path:
+        """The site package folder within the tox environment."""
+        cmd = 'from sysconfig import get_paths; print(get_paths()["purelib"])'
+        path = self._call_python_in_conda_env(cmd, "env_site_package_dir")
+        return Path(path).resolve()
+
+    def env_python(self) -> Path:
+        """The python executable within the tox environment."""
+        cmd = "import sys; print(sys.executable)"
+        path = self._call_python_in_conda_env(cmd, "env_python")
+        return Path(path).resolve()
+
+    def env_bin_dir(self) -> Path:
+        """The binary folder within the tox environment."""
+        cmd = 'from sysconfig import get_paths; print(get_paths()["scripts"])'
+        path = self._call_python_in_conda_env(cmd, "env_bin_dir")
+        return Path(path).resolve()
 
     def _call_python_in_conda_env(self, cmd: str, run_id: str):
         self._ensure_python_env_exists()
@@ -222,20 +211,31 @@ class CondaEnvRunner(VirtualEnvRunner):
 
         return execute_status.out.decode().strip()
 
-    @property
-    def installer(self) -> Installer[Any]:
-        if self._installer is None:
-            self._installer = Pip(self)
-        return self._installer
+    def _ensure_python_env_exists(self) -> None:
+        if not Path(self.env_dir).exists():
+            self.create_python_env()
+            self._created = True
+            return
 
-    def prepend_env_var_path(self) -> List[Path]:
-        conda_exe: Path = find_conda()
-        return [conda_exe.parent]
+        if self._created:
+            return
 
-    def _default_pass_env(self) -> List[str]:
-        env = super()._default_pass_env()
-        env.append("*CONDA*")
-        return env
+        conda_exe = find_conda()
+        cmd = f"'{conda_exe}' env list --json"
+        try:
+            cmd_list = shlex.split(cmd)
+            result: subprocess.CompletedProcess = subprocess.run(
+                cmd_list, check=True, capture_output=True
+            )
+        except subprocess.CalledProcessError as e:
+            raise Fail(f"Failed to list conda environments. Error: {e}")
+        envs = json.loads(result.stdout.decode())
+        if str(self.env_dir) in envs["envs"]:
+            self._created = True
+        else:
+            raise Fail(
+                f"{self.env_dir} already exists, but it is not a conda environment. Delete in manually first."
+            )
 
 
 @impl
@@ -254,30 +254,6 @@ def postprocess_path_option(testenv_config, value):
     if value == testenv_config.config.toxinidir:
         return None
     return value
-
-
-def get_py_version(envconfig, action):
-    # Try to use basepython
-    match = re.match(r"python(\d)(?:\.(\d+))?(?:\.?(\d))?", envconfig.basepython)
-    if match:
-        groups = match.groups()
-        version = groups[0]
-        if groups[1]:
-            version += ".{}".format(groups[1])
-        if groups[2]:
-            version += ".{}".format(groups[2])
-
-    # First fallback
-    elif envconfig.python_info.version_info:
-        version = "{}.{}".format(*envconfig.python_info.version_info[:2])
-
-    # Second fallback
-    else:
-        code = "import sys; print('{}.{}'.format(*sys.version_info[:2]))"
-        result = action.popen([envconfig.basepython, "-c", code], report_fail=True, returnout=True)
-        version = result.decode("utf-8").strip()
-
-    return "python={}".format(version)
 
 
 @impl
@@ -371,34 +347,6 @@ def find_conda() -> Path:
             pass
 
     raise Fail("Failed to find 'conda' executable.")
-
-def find_conda():
-    # This should work if we're not already in an environment
-    conda_exe = os.environ.get("_CONDA_EXE")
-    if conda_exe:
-        return conda_exe
-
-    # This should work if we're in an active environment
-    conda_exe = os.environ.get("CONDA_EXE")
-    if conda_exe:
-        return conda_exe
-
-    path = shutil.which("conda")
-
-    if path is None:
-        _exit_on_missing_conda()
-
-    try:
-        subprocess.run([str(path), "-h"], stdout=subprocess.DEVNULL)
-    except subprocess.CalledProcessError:
-        _exit_on_missing_conda()
-
-    return path
-
-
-def _exit_on_missing_conda():
-    tox.reporter.error(MISSING_CONDA_ERROR)
-    raise SystemExit(0)
 
 
 def _run_conda_process(args, venv, action, cwd):
