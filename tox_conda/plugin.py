@@ -43,6 +43,8 @@ from tox.tox_env.python.virtual_env.runner import VirtualEnvRunner
 from tox.tox_env.python.pip.req_file import PythonDeps
 
 
+__all__ = []
+
 class CondaEnvRunner(VirtualEnvRunner):
     def __init__(self, create_args: ToxEnvCreateArgs) -> None:
         self._installer = None
@@ -70,26 +72,8 @@ class CondaEnvRunner(VirtualEnvRunner):
         else:
             return self.base_python.version_dot
 
-    @staticmethod
-    def _find_conda() -> Path:
-        # This should work if we're not already in an environment
-        conda_exe = os.environ.get("_CONDA_EXE")
-        if conda_exe:
-            return Path(conda_exe).resolve()
-
-        # This should work if we're in an active environment
-        conda_exe = os.environ.get("CONDA_EXE")
-        if conda_exe:
-            return Path(conda_exe).resolve()
-
-        conda_exe = shutil.which("conda")
-        if conda_exe:
-            return Path(conda_exe).resolve()
-
-        raise Fail("Failed to find 'conda' executable.")
-
     def create_python_env(self) -> None:
-        conda_exe = CondaEnvRunner._find_conda()
+        conda_exe = find_conda()
         python_version = self._get_python_env_version()
 
         conf = self.python_cache()
@@ -131,7 +115,7 @@ class CondaEnvRunner(VirtualEnvRunner):
         if self._created:
             return
 
-        conda_exe = CondaEnvRunner._find_conda()
+        conda_exe = find_conda()
         cmd = f"'{conda_exe}' env list --json"
         try:
             cmd_list = shlex.split(cmd)
@@ -245,7 +229,7 @@ class CondaEnvRunner(VirtualEnvRunner):
         return self._installer
 
     def prepend_env_var_path(self) -> List[Path]:
-        conda_exe: Path = CondaEnvRunner._find_conda()
+        conda_exe: Path = find_conda()
         return [conda_exe.parent]
 
     def _default_pass_env(self) -> List[str]:
@@ -258,7 +242,8 @@ class CondaEnvRunner(VirtualEnvRunner):
 def tox_register_tox_env(register: ToxEnvRegister) -> None:  # noqa: U100
     register.add_run_env(CondaEnvRunner)
     try:
-        CondaEnvRunner._find_conda()
+        # Change the defaukt runner only if conda is available
+        find_conda()
         if "CONDA_DEFAULT_ENV" in os.environ:
             register.default_env_runner = "conda"
     except Fail:
@@ -364,6 +349,28 @@ def tox_configure(config):
 
         envconfig.conda_exe = conda_exe
 
+
+def find_conda() -> Path:
+    # This should work if we're not already in an environment
+    conda_exe = os.environ.get("_CONDA_EXE")
+    if conda_exe:
+        return Path(conda_exe).resolve()
+
+    # This should work if we're in an active environment
+    conda_exe = os.environ.get("CONDA_EXE")
+    if conda_exe:
+        return Path(conda_exe).resolve()
+
+    conda_exe = shutil.which("conda")
+    if conda_exe:
+        conda_exe = Path(conda_exe).resolve()
+        try:
+            subprocess.run([str(conda_exe), "-h"], stdout=subprocess.DEVNULL)
+            return conda_exe
+        except subprocess.CalledProcessError:
+            pass
+
+    raise Fail("Failed to find 'conda' executable.")
 
 def find_conda():
     # This should work if we're not already in an environment
