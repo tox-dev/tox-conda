@@ -1,11 +1,4 @@
 import copy
-import os
-import re
-import shutil
-import subprocess
-import tempfile
-from pathlib import Path
-from functools import partial
 import hashlib
 import json
 import os
@@ -13,35 +6,28 @@ import re
 import shlex
 import shutil
 import subprocess
+import tempfile
+from functools import partial
 from io import BytesIO, TextIOWrapper
 from pathlib import Path
 from time import sleep
 from typing import Any, Dict, List
 
-from tox.execute.api import (
-    Execute,
-    ExecuteInstance,
-    ExecuteOptions,
-    ExecuteRequest,
-    SyncWrite,
-)
-from tox.execute.local_sub_process import (
-    LocalSubProcessExecuteInstance,
-    LocalSubProcessExecutor,
-)
+from ruamel.yaml import YAML
+
+from tox.execute.api import Execute, ExecuteInstance, ExecuteOptions, ExecuteRequest, SyncWrite
+from tox.execute.local_sub_process import LocalSubProcessExecuteInstance, LocalSubProcessExecutor
 from tox.plugin import impl
-from tox.plugin.spec import EnvConfigSet, State, ToxEnvRegister, ToxParser
-from tox.tox_env.api import StdinSource, ToxEnv, ToxEnvCreateArgs
+from tox.plugin.spec import EnvConfigSet, State, ToxEnvRegister
+from tox.tox_env.api import StdinSource, ToxEnvCreateArgs
 from tox.tox_env.errors import Fail
 from tox.tox_env.installer import Installer
 from tox.tox_env.python.pip.pip_install import Pip
-from tox.tox_env.python.virtual_env.runner import VirtualEnvRunner
 from tox.tox_env.python.pip.req_file import PythonDeps
-
-from ruamel.yaml import YAML
-
+from tox.tox_env.python.virtual_env.runner import VirtualEnvRunner
 
 __all__ = []
+
 
 class CondaEnvRunner(VirtualEnvRunner):
     def __init__(self, create_args: ToxEnvCreateArgs) -> None:
@@ -56,9 +42,7 @@ class CondaEnvRunner(VirtualEnvRunner):
 
     def _get_python_env_version(self):
         # Try to use base_python config
-        match = re.match(
-            r"python(\d)(?:\.(\d+))?(?:\.?(\d))?", self.conf["base_python"][0]
-        )
+        match = re.match(r"python(\d)(?:\.(\d+))?(?:\.?(\d))?", self.conf["base_python"][0])
         if match:
             groups = match.groups()
             version = groups[0]
@@ -125,29 +109,30 @@ class CondaEnvRunner(VirtualEnvRunner):
         conda_cache_conf = self.python_cache()["conda"]
 
         if self.conf["conda_env"]:
-            create_command, tear_down = CondaEnvRunner._generate_env_create_command(conda_exe, python, conda_cache_conf)
+            create_command, tear_down = CondaEnvRunner._generate_env_create_command(
+                conda_exe, python, conda_cache_conf
+            )
         else:
-            create_command, tear_down = CondaEnvRunner._generate_create_command(conda_exe, python, conda_cache_conf)
+            create_command, tear_down = CondaEnvRunner._generate_create_command(
+                conda_exe, python, conda_cache_conf
+            )
         try:
             create_command_args = shlex.split(create_command)
             subprocess.run(create_command_args, check=True)
         except subprocess.CalledProcessError as e:
-            raise Fail(
-                f"Failed to create '{self.env_dir}' conda environment. Error: {e}"
-            )
+            raise Fail(f"Failed to create '{self.env_dir}' conda environment. Error: {e}")
         finally:
             tear_down()
 
-        install_command = CondaEnvRunner._generate_install_command(conda_exe, python, conda_cache_conf)
+        install_command = CondaEnvRunner._generate_install_command(
+            conda_exe, python, conda_cache_conf
+        )
         if install_command:
             try:
                 install_command_args = shlex.split(install_command)
                 subprocess.run(install_command_args, check=True)
             except subprocess.CalledProcessError as e:
-                raise Fail(
-                    f"Failed to install dependencies in conda environment. Error: {e}"
-                )
-        
+                raise Fail(f"Failed to install dependencies in conda environment. Error: {e}")
 
     @staticmethod
     def _generate_env_create_command(conda_exe, python, conda_cache_conf):
@@ -202,7 +187,7 @@ class CondaEnvRunner(VirtualEnvRunner):
         # with the installed python version, installation will fail (which is what
         # we want).
         cmd += f" {python}"
-        
+
         for dep in conda_cache_conf.get("deps", []):
             cmd += f" {dep}"
 
@@ -257,7 +242,7 @@ class CondaEnvRunner(VirtualEnvRunner):
         env = super()._default_pass_env()
         env.append("*CONDA*")
         return env
-    
+
     def env_site_package_dir(self) -> Path:
         """The site package folder within the tox environment."""
         cmd = 'from sysconfig import get_paths; print(get_paths()["purelib"])'
@@ -357,7 +342,7 @@ def tox_add_env_config(env_conf: EnvConfigSet, state: State) -> None:
         "conda_name",
         of_type=str,
         desc="Specifies the name of the conda environment. By default, .tox/<name> is used.",
-        default=None
+        default=None,
     )
 
     env_conf.add_config(
@@ -384,20 +369,26 @@ def tox_add_env_config(env_conf: EnvConfigSet, state: State) -> None:
     )
 
     env_conf.add_config(
-        "conda_channels", of_type=List[str], desc="each line specifies a conda channel", default=None,
+        "conda_channels",
+        of_type=List[str],
+        desc="each line specifies a conda channel",
+        default=None,
     )
 
     env_conf.add_config(
         "conda_install_args",
         of_type=List[str],
-        desc="each line specifies a conda install argument",default=None,
+        desc="each line specifies a conda install argument",
+        default=None,
     )
 
     env_conf.add_config(
         "conda_create_args",
         of_type=List[str],
-        desc="each line specifies a conda create argument",default=None,
+        desc="each line specifies a conda create argument",
+        default=None,
     )
+
 
 def find_conda() -> Path:
     # This should work if we're not already in an environment
@@ -423,7 +414,7 @@ def find_conda() -> Path:
 
 
 def hash_file(file: Path) -> str:
-    with open(file.name, 'rb') as f:
+    with open(file.name, "rb") as f:
         sha1 = hashlib.sha1()
         sha1.update(f.read())
         return sha1.hexdigest()
