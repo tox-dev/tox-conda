@@ -70,39 +70,67 @@ class CondaEnvRunner(VirtualEnvRunner):
         else:
             return self.base_python.version_dot
 
+    def python_cache(self) -> Dict[str, Any]:
+        conda_dict = {}
+
+        conda_name = getattr(self.options, "conda_name", None)
+        if not conda_name:
+            conda_name = self.conf["conda_name"]
+
+        if conda_name:
+            conda_dict["env_spec"] = "-n"
+            conda_dict["env"] = conda_name
+        elif self.conf["conda_env"]:
+            conda_dict["env_spec"] = "-n"
+            env_path = Path(self.conf["conda_env"]).resolve()
+            env_file = YAML().load(env_path)
+            conda_dict["env"] = env_file["name"]
+            conda_dict["env_path"] = str(env_path)
+            conda_dict["env_hash"] = hash_file(Path(self.conf["conda_env"]).resolve())
+        else:
+            conda_dict["env_spec"] = "-p"
+            conda_dict["env"] = str(self.env_dir)
+
+        _, conda_deps = self.conf["conda_deps"].unroll()
+        if conda_deps:
+            conda_dict["deps"] = conda_deps
+
+        conda_spec = self.conf["conda_spec"]
+        if conda_spec:
+            conda_dict["spec"] = conda_spec
+            conda_dict["spec_hash"] = hash_file(Path(conda_spec).resolve())
+
+        conda_channels = self.conf["conda_channels"]
+        if conda_channels:
+            conda_dict["channels"] = conda_channels
+
+        conda_install_args = self.conf["conda_install_args"]
+        if conda_install_args:
+            conda_dict["install_args"] = conda_install_args
+
+        conda_create_args = self.conf["conda_create_args"]
+        if conda_create_args:
+            conda_dict["create_args"] = conda_create_args
+
+        base = super().python_cache()
+        base.update(
+            {"conda": conda_dict},
+        )
+        return base
+
     def create_python_env(self) -> None:
         conda_exe = find_conda()
         python_version = self._get_python_env_version()
         python = f"python={python_version}"
-
-        cache_conf = self.python_cache()
+        conda_cache_conf = self.python_cache()["conda"]
 
         if self.conf["conda_env"]:
-            env_path = Path(self.conf["conda_env"]).resolve()
-            # conda env create does not have a --channel argument nor does it take
-            # dependencies specifications (e.g., python=3.8). These must all be specified
-            # in the conda-env.yml file
-            yaml = YAML()
-            env_file = yaml.load(env_path)
-            env_file["dependencies"].append(python)
-
-            tmp_env_file = tempfile.NamedTemporaryFile(
-                dir=env_path.parent,
-                prefix="tox_conda_tmp",
-                suffix=".yaml",
-                delete=False,
-            )
-            yaml.dump(env_file, tmp_env_file)
-            tmp_env_file.close()
-
-            cmd = f"'{conda_exe}' env create --file '{tmp_env_file.name}' --quiet --force"
-            tear_down = lambda: Path(tmp_env_file.name).unlink()
+            create_command, tear_down = CondaEnvRunner._generate_env_create_command(conda_exe, python, conda_cache_conf)
         else:
-            cmd = f"'{conda_exe}' create {cache_conf['conda_env_spec']} '{cache_conf['conda_env']}' {python} --yes --quiet"
-            tear_down = lambda: None
+            create_command, tear_down = CondaEnvRunner._generate_create_command(conda_exe, python, conda_cache_conf)
         try:
-            cmd_list = shlex.split(cmd)
-            subprocess.run(cmd_list, check=True)
+            create_command_args = shlex.split(create_command)
+            subprocess.run(create_command_args, check=True)
         except subprocess.CalledProcessError as e:
             raise Fail(
                 f"Failed to create '{self.env_dir}' conda environment. Error: {e}"
@@ -110,44 +138,86 @@ class CondaEnvRunner(VirtualEnvRunner):
         finally:
             tear_down()
 
-    def python_cache(self) -> Dict[str, Any]:
-        base = super().python_cache()
+        install_command = CondaEnvRunner._generate_install_command(conda_exe, python, conda_cache_conf)
+        if install_command:
+            try:
+                install_command_args = shlex.split(install_command)
+                subprocess.run(install_command_args, check=True)
+            except subprocess.CalledProcessError as e:
+                raise Fail(
+                    f"Failed to install dependencies in conda environment. Error: {e}"
+                )
+        
 
-        conda_name = getattr(self.options, "conda_name", None)
-        if not conda_name:
-            conda_name = self.conf["conda_name"]
+    @staticmethod
+    def _generate_env_create_command(conda_exe, python, conda_cache_conf):
+        env_path = Path(conda_cache_conf["env_path"]).resolve()
+        # conda env create does not have a --channel argument nor does it take
+        # dependencies specifications (e.g., python=3.8). These must all be specified
+        # in the conda-env.yml file
+        yaml = YAML()
+        env_file = yaml.load(env_path)
+        env_file["dependencies"].append(python)
 
-        if conda_name:
-            conda_env_spec = "-n"
-            conda_env = conda_name
-            conda_hash = ""
-        elif self.conf["conda_env"]:
-            conda_env_spec = f"-n"
-            env_path = Path(self.conf["conda_env"]).resolve()
-            env_file = YAML().load(env_path)
-            conda_env = env_file["name"]
-            conda_hash = hash_file(Path(self.conf["conda_env"]).resolve())
-        else:
-            conda_env_spec = "-p"
-            conda_env = f"{self.env_dir}"
-            conda_hash = ""
-
-        base.update(
-            {"conda_env_spec": conda_env_spec, "conda_env": conda_env, "conda_hash": conda_hash},
+        tmp_env_file = tempfile.NamedTemporaryFile(
+            dir=env_path.parent,
+            prefix="tox_conda_tmp",
+            suffix=".yaml",
+            delete=False,
         )
-        return base
+        yaml.dump(env_file, tmp_env_file)
+        tmp_env_file.close()
+
+        cmd = f"'{conda_exe}' env create --file '{tmp_env_file.name}' --quiet --force"
+        tear_down = lambda: Path(tmp_env_file.name).unlink()
+
+        return cmd, tear_down
+
+    @staticmethod
+    def _generate_create_command(conda_exe, python, conda_cache_conf):
+        cmd = f"'{conda_exe}' create {conda_cache_conf['env_spec']} '{conda_cache_conf['env']}' {python} --yes --quiet"
+        for arg in conda_cache_conf.get("create_args", []):
+            cmd += f" '{arg}'"
+
+        tear_down = lambda: None
+        return cmd, tear_down
+
+    @staticmethod
+    def _generate_install_command(conda_exe, python, conda_cache_conf):
+        # Check if there is anything to install
+        if "deps" not in conda_cache_conf and "spec" not in conda_cache_conf:
+            return None
+
+        cmd = f"'{conda_exe}' install --quiet --yes {conda_cache_conf['env_spec']} '{conda_cache_conf['env']}'"
+        for channel in conda_cache_conf.get("channels", []):
+            cmd += f" --channel {channel}"
+
+        # Add end-user conda install args
+        for arg in conda_cache_conf.get("install_args", []):
+            cmd += f" {arg}"
+
+        # We include the python version in the conda requirements in order to make
+        # sure that none of the other conda requirements inadvertently downgrade
+        # python in this environment. If any of the requirements are in conflict
+        # with the installed python version, installation will fail (which is what
+        # we want).
+        cmd += f" {python}"
+        
+        for dep in conda_cache_conf.get("deps", []):
+            cmd += f" {dep}"
+
+        if "spec" in conda_cache_conf:
+            cmd += f" --file={conda_cache_conf['spec']}"
+
+        return cmd
 
     @property
     def executor(self) -> Execute:
         def get_conda_command_prefix():
-            conf = self.python_cache()
-            return [
-                "conda",
-                "run",
-                conf["conda_env_spec"],
-                conf["conda_env"],
-                "--live-stream",
-            ]
+            conda_exe = find_conda()
+            cache_conf = self.python_cache()
+            cmd = f"'{conda_exe}' run {cache_conf['conda']['env_spec']} '{cache_conf['conda']['env']}' --live-stream"
+            return shlex.split(cmd)
 
         class CondaExecutor(LocalSubProcessExecutor):
             def build_instance(
@@ -299,7 +369,7 @@ def tox_add_env_config(env_conf: EnvConfigSet, state: State) -> None:
 
     env_conf.add_config(
         "conda_spec",
-        of_type="path",
+        of_type=str,
         desc="specify a conda spec-file.txt file",
         default=None,
     )
@@ -314,21 +384,20 @@ def tox_add_env_config(env_conf: EnvConfigSet, state: State) -> None:
     )
 
     env_conf.add_config(
-        "conda_channels", of_type="line-list", desc="each line specifies a conda channel", default=None,
+        "conda_channels", of_type=List[str], desc="each line specifies a conda channel", default=None,
     )
 
     env_conf.add_config(
         "conda_install_args",
-        of_type="line-list",
+        of_type=List[str],
         desc="each line specifies a conda install argument",default=None,
     )
 
     env_conf.add_config(
         "conda_create_args",
-        of_type="line-list",
+        of_type=List[str],
         desc="each line specifies a conda create argument",default=None,
     )
-
 
 def find_conda() -> Path:
     # This should work if we're not already in an environment
@@ -358,60 +427,3 @@ def hash_file(file: Path) -> str:
         sha1 = hashlib.sha1()
         sha1.update(f.read())
         return sha1.hexdigest()
-
-
-def install_conda_deps(venv, action, basepath, envdir):
-    # Account for the fact that we have a list of DepOptions
-    conda_deps = [str(dep.name) for dep in venv.envconfig.conda_deps]
-    # Add the conda-spec.txt file to the end of the conda deps b/c any deps
-    # after --file option(s) are ignored
-    if venv.envconfig.conda_spec is not None:
-        conda_deps.append("--file={}".format(venv.envconfig.conda_spec))
-
-    action.setactivity("installcondadeps", ", ".join(conda_deps))
-
-    # Install quietly to make the log cleaner
-    args = [venv.envconfig.conda_exe, "install", "--quiet", "--yes", "-p", envdir]
-    for channel in venv.envconfig.conda_channels:
-        args += ["--channel", channel]
-
-    # Add end-user conda install args
-    args += venv.envconfig.conda_install_args
-
-    # We include the python version in the conda requirements in order to make
-    # sure that none of the other conda requirements inadvertently downgrade
-    # python in this environment. If any of the requirements are in conflict
-    # with the installed python version, installation will fail (which is what
-    # we want).
-    args += [venv.envconfig.conda_python] + conda_deps
-
-    _run_conda_process(args, venv, action, basepath)
-
-
-# @hookimpl
-def tox_testenv_install_deps(venv, action):
-    # Save the deps before we make temporary changes.
-    saved_deps = copy.deepcopy(venv.envconfig.deps)
-
-    num_conda_deps = len(venv.envconfig.conda_deps)
-    if venv.envconfig.conda_spec is not None:
-        num_conda_deps += 1
-
-    if num_conda_deps > 0:
-        install_conda_deps(venv, action, venv.path.dirpath(), venv.envconfig.envdir)
-
-    # Account for the fact that we added the conda_deps to the deps list in
-    # tox_configure (see comment there for rationale). We don't want them
-    # to be present when we call pip install.
-    if venv.envconfig.conda_env is not None:
-        num_conda_deps += 1
-    if num_conda_deps > 0:
-        venv.envconfig.deps = venv.envconfig.deps[:-num_conda_deps]
-
-    with activate_env(venv, action):
-        tox.venv.tox_testenv_install_deps(venv=venv, action=action)
-
-    # Restore the deps.
-    venv.envconfig.deps = saved_deps
-
-    return True
