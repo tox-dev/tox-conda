@@ -14,7 +14,6 @@ from time import sleep
 from typing import Any, Dict, List
 
 from ruamel.yaml import YAML
-
 from tox.execute.api import Execute, ExecuteInstance, ExecuteOptions, ExecuteRequest, SyncWrite
 from tox.execute.local_sub_process import LocalSubProcessExecuteInstance, LocalSubProcessExecutor
 from tox.plugin import impl
