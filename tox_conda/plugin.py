@@ -7,11 +7,6 @@ import tempfile
 from pathlib import Path
 from functools import partial
 import hashlib
-
-
-MISSING_CONDA_ERROR = "Cannot locate the conda executable."
-
-
 import json
 import os
 import re
@@ -286,12 +281,6 @@ def tox_register_tox_env(register: ToxEnvRegister) -> None:  # noqa: U100
         pass
 
 
-def postprocess_path_option(*args, **kwargs):
-    if value == testenv_config.config.toxinidir:
-        return None
-    return value
-
-
 @impl
 def tox_add_env_config(env_conf: EnvConfigSet, state: State) -> None:
     env_conf.add_config(
@@ -306,7 +295,6 @@ def tox_add_env_config(env_conf: EnvConfigSet, state: State) -> None:
         of_type=str,
         desc="specify a conda environment.yml file",
         default=None,
-        # post_process=postprocess_path_option,
     )
 
     env_conf.add_config(
@@ -314,7 +302,6 @@ def tox_add_env_config(env_conf: EnvConfigSet, state: State) -> None:
         of_type="path",
         desc="specify a conda spec-file.txt file",
         default=None,
-        post_process=postprocess_path_option,
     )
 
     root = env_conf._conf.core["tox_root"]
@@ -341,33 +328,6 @@ def tox_add_env_config(env_conf: EnvConfigSet, state: State) -> None:
         of_type="line-list",
         desc="each line specifies a conda create argument",default=None,
     )
-
-
-# @hookimpl
-def tox_configure(config):
-    # This is a pretty cheesy workaround. It allows tox to consider changes to
-    # the conda dependencies when it decides whether an existing environment
-    # needs to be updated before being used.
-
-    # Set path to the conda executable because it cannot be determined once
-    # an env has already been created.
-    conda_exe = find_conda()
-
-    for envconfig in config.envconfigs.values():
-        # Make sure the right environment is activated. This works because we're
-        # creating environments using the `-p/--prefix` option in `tox_testenv_create`
-        envconfig.setenv["CONDA_DEFAULT_ENV"] = envconfig.setenv["TOX_ENV_DIR"]
-
-        conda_deps = [DepConfig(str(name)) for name in envconfig.conda_deps]
-        # Append filenames of additional dependency sources. tox will automatically hash
-        # their contents to detect changes.
-        if envconfig.conda_spec is not None:
-            conda_deps.append(DepConfig(envconfig.conda_spec))
-        if envconfig.conda_env is not None:
-            conda_deps.append(DepConfig(envconfig.conda_env))
-        envconfig.deps.extend(conda_deps)
-
-        envconfig.conda_exe = conda_exe
 
 
 def find_conda() -> Path:
@@ -398,76 +358,6 @@ def hash_file(file: Path) -> str:
         sha1 = hashlib.sha1()
         sha1.update(f.read())
         return sha1.hexdigest()
-
-def _run_conda_process(args, venv, action, cwd):
-    redirect = tox.reporter.verbosity() < tox.reporter.Verbosity.DEBUG
-    venv._pcall(args, venv=False, action=action, cwd=cwd, redirect=redirect)
-
-
-# @hookimpl
-def tox_testenv_create(venv, action):
-    tox.venv.cleanup_for_venv(venv)
-    basepath = venv.path.dirpath()
-
-    # Check for venv.envconfig.sitepackages and venv.config.alwayscopy here
-    envdir = venv.envconfig.envdir
-    python = get_py_version(venv.envconfig, action)
-
-    if venv.envconfig.conda_env is not None:
-        env_path = Path(venv.envconfig.conda_env)
-        # conda env create does not have a --channel argument nor does it take
-        # dependencies specifications (e.g., python=3.8). These must all be specified
-        # in the conda-env.yml file
-        yaml = YAML()
-        env_file = yaml.load(env_path)
-        env_file["dependencies"].append(python)
-
-        tmp_env = tempfile.NamedTemporaryFile(
-            dir=env_path.parent,
-            prefix="tox_conda_tmp",
-            suffix=".yaml",
-            delete=False,
-        )
-        yaml.dump(env_file, tmp_env)
-
-        args = [
-            venv.envconfig.conda_exe,
-            "env",
-            "create",
-            "-p",
-            envdir,
-            "--file",
-            tmp_env.name,
-        ]
-        tmp_env.close()
-        _run_conda_process(args, venv, action, basepath)
-        Path(tmp_env.name).unlink()
-
-    else:
-        args = [venv.envconfig.conda_exe, "create", "--yes", "-p", envdir]
-        for channel in venv.envconfig.conda_channels:
-            args += ["--channel", channel]
-
-        # Add end-user conda create args
-        args += venv.envconfig.conda_create_args
-
-        args += [python]
-
-        _run_conda_process(args, venv, action, basepath)
-
-    venv.envconfig.conda_python = python
-
-    # let the venv know about the target interpreter just installed in our conda env, otherwise
-    # we'll have a mismatch later because tox expects the interpreter to be existing outside of
-    # the env
-    try:
-        del venv.envconfig.config.interpreters.name2executable[venv.name]
-    except KeyError:
-        pass
-
-    venv.envconfig.config.interpreters.get_executable(venv.envconfig)
-
-    return True
 
 
 def install_conda_deps(venv, action, basepath, envdir):
@@ -525,62 +415,3 @@ def tox_testenv_install_deps(venv, action):
     venv.envconfig.deps = saved_deps
 
     return True
-
-
-# @hookimpl
-def tox_get_python_executable(envconfig):
-    if tox.INFO.IS_WIN:
-        path = envconfig.envdir.join("python.exe")
-    else:
-        path = envconfig.envdir.join("bin", "python")
-    if path.exists():
-        return path
-
-
-# Monkey patch TestenConfig get_envpython to fix tox behavior with tox-conda under windows
-def get_envpython(self):
-    """Override get_envpython to handle windows where the interpreter in at the env root dir."""
-    original_envpython = self.__get_envpython()
-    if original_envpython.exists():
-        return original_envpython
-    if tox.INFO.IS_WIN:
-        return self.envdir.join("python")
-
-
-# TestenvConfig.__get_envpython = TestenvConfig.get_envpython
-# TestenvConfig.get_envpython = get_envpython
-
-
-# Monkey patch TestenvConfig _venv_lookup to fix tox behavior with tox-conda under windows
-def venv_lookup(self, name):
-    """Override venv_lookup to also look at the env root dir under windows."""
-    paths = [self.envconfig.envbindir]
-    # In Conda environments on Windows, the Python executable is installed in
-    # the top-level environment directory, as opposed to virtualenvs, where it
-    # is installed in the Scripts directory. Tox assumes that looking in the
-    # Scripts directory is sufficient, which is why this workaround is required.
-    if tox.INFO.IS_WIN:
-        paths += [self.envconfig.envdir]
-    return py.path.local.sysfind(name, paths=paths)
-
-
-# VirtualEnv._venv_lookup = venv_lookup
-
-
-# @hookimpl(hookwrapper=True)
-def tox_runtest_pre(venv):
-    with activate_env(venv):
-        yield
-
-
-# @hookimpl
-def tox_runtest(venv, redirect):
-    with activate_env(venv):
-        tox.venv.tox_runtest(venv, redirect)
-    return True
-
-
-# @hookimpl(hookwrapper=True)
-def tox_runtest_post(venv):
-    with activate_env(venv):
-        yield
