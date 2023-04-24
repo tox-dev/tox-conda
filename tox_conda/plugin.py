@@ -22,10 +22,9 @@ from tox.tox_env.api import StdinSource, ToxEnvCreateArgs
 from tox.tox_env.errors import Fail
 from tox.tox_env.installer import Installer
 from tox.tox_env.python.api import PythonInfo, VersionInfo
-from tox.tox_env.python.runner import PythonRun
 from tox.tox_env.python.pip.pip_install import Pip
 from tox.tox_env.python.pip.req_file import PythonDeps
-
+from tox.tox_env.python.runner import PythonRun
 
 __all__ = []
 
@@ -40,26 +39,35 @@ class CondaEnvRunner(PythonRun):
     @staticmethod
     def id() -> str:  # noqa A003
         return "conda"
-    
+
     def _get_python(self, base_python: List[str]) -> PythonInfo | None:
         exe_path = base_python[0]
-        
-        output = subprocess.check_output([exe_path, "-c", "import platform, sys; print(platform.python_implementation());print(platform.sys.version_info);print(sys.version);print(sys.maxsize > 2**32);print(platform.system())"])
+
+        output = subprocess.check_output(
+            [
+                exe_path,
+                "-c",
+                "import platform, sys; print(platform.python_implementation());print(platform.sys.version_info);print(sys.version);print(sys.maxsize > 2**32);print(platform.system())",
+            ]
+        )
         output = output.decode("utf-8").strip().split(os.linesep)
-        
+
         implementation, version_info, version, is_64, platform_name = output
-        
+
         is_64 = bool(is_64)
-        match = re.match(r"sys\.version_info\(major=(\d+), minor=(\d+), micro=(\d+), releaselevel='(\w+)', serial=(\d+)\)", version_info)
+        match = re.match(
+            r"sys\.version_info\(major=(\d+), minor=(\d+), micro=(\d+), releaselevel='(\w+)', serial=(\d+)\)",
+            version_info,
+        )
         version_info = VersionInfo(
             major=int(match.group(1)),
             minor=int(match.group(2)),
             micro=int(match.group(3)),
             releaselevel=match.group(4),
-            serial=int(match.group(5))
+            serial=int(match.group(5)),
         )
         extra = {"executable_path": exe_path}
-        
+
         return PythonInfo(implementation, version_info, version, is_64, platform_name, extra)
 
     @property
@@ -169,7 +177,9 @@ class CondaEnvRunner(PythonRun):
                 raise Fail(f"Failed to install dependencies in conda environment. Error: {e}")
 
     @staticmethod
-    def _generate_env_create_command(conda_exe: Path, python: str, conda_cache_conf: Dict[str, str]):
+    def _generate_env_create_command(
+        conda_exe: Path, python: str, conda_cache_conf: Dict[str, str]
+    ):
         env_path = Path(conda_cache_conf["env_path"]).resolve()
         # conda env create does not have a --channel argument nor does it take
         # dependencies specifications (e.g., python=3.8). These must all be specified
