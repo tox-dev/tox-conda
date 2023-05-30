@@ -47,7 +47,13 @@ class CondaEnvRunner(PythonRun):
             [
                 exe_path,
                 "-c",
-                "import platform, sys; print(platform.python_implementation());print(platform.sys.version_info);print(sys.version);print(sys.maxsize > 2**32);print(platform.system())",
+                (
+                    "import platform, sys;"
+                    "print(platform.python_implementation());"
+                    "print(platform.sys.version_info);"
+                    "print(sys.version);"
+                    "print(sys.maxsize > 2**32);print(platform.system())"
+                ),
             ]
         )
         output = output.decode("utf-8").strip().split(os.linesep)
@@ -56,7 +62,10 @@ class CondaEnvRunner(PythonRun):
 
         is_64 = bool(is_64)
         match = re.match(
-            r"sys\.version_info\(major=(\d+), minor=(\d+), micro=(\d+), releaselevel='(\w+)', serial=(\d+)\)",
+            (
+                r"sys\.version_info\(major=(\d+), minor=(\d+), micro=(\d+), releaselevel='(\w+)',"
+                r" serial=(\d+)\)"
+            ),
             version_info,
         )
         version_info = VersionInfo(
@@ -198,17 +207,24 @@ class CondaEnvRunner(PythonRun):
         tmp_env_file.close()
 
         cmd = f"'{conda_exe}' env create --file '{tmp_env_file.name}' --quiet --force"
-        tear_down = lambda: Path(tmp_env_file.name).unlink()
+
+        def tear_down():
+            return Path(tmp_env_file.name).unlink()
 
         return cmd, tear_down
 
     @staticmethod
     def _generate_create_command(conda_exe: Path, python: str, conda_cache_conf: Dict[str, str]):
-        cmd = f"'{conda_exe}' create {conda_cache_conf['env_spec']} '{conda_cache_conf['env']}' {python} --yes --quiet"
+        cmd = (
+            f"'{conda_exe}' create {conda_cache_conf['env_spec']} '{conda_cache_conf['env']}'"
+            f" {python} --yes --quiet"
+        )
         for arg in conda_cache_conf.get("create_args", []):
             cmd += f" '{arg}'"
 
-        tear_down = lambda: None
+        def tear_down():
+            return None
+
         return cmd, tear_down
 
     @staticmethod
@@ -217,7 +233,10 @@ class CondaEnvRunner(PythonRun):
         if "deps" not in conda_cache_conf and "spec" not in conda_cache_conf:
             return None
 
-        cmd = f"'{conda_exe}' install --quiet --yes {conda_cache_conf['env_spec']} '{conda_cache_conf['env']}'"
+        cmd = (
+            f"'{conda_exe}' install --quiet --yes"
+            f" {conda_cache_conf['env_spec']} '{conda_cache_conf['env']}'"
+        )
         for channel in conda_cache_conf.get("channels", []):
             cmd += f" --channel {channel}"
 
@@ -245,7 +264,10 @@ class CondaEnvRunner(PythonRun):
         def get_conda_command_prefix():
             conda_exe = find_conda()
             cache_conf = self.python_cache()
-            cmd = f"'{conda_exe}' run {cache_conf['conda']['env_spec']} '{cache_conf['conda']['env']}' --live-stream"
+            cmd = (
+                f"'{conda_exe}' run"
+                f" {cache_conf['conda']['env_spec']} '{cache_conf['conda']['env']}' --live-stream"
+            )
             return shlex.split(cmd)
 
         class CondaExecutor(LocalSubProcessExecutor):
@@ -364,7 +386,8 @@ class CondaEnvRunner(PythonRun):
             self._created = True
         else:
             raise Fail(
-                f"{self.env_dir} already exists, but it is not a conda environment. Delete in manually first."
+                f"{self.env_dir} already exists, but it is not a conda environment. Delete in"
+                " manually first."
             )
 
 
