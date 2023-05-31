@@ -48,10 +48,10 @@ class CondaEnvRunner(PythonRun):
                 exe_path,
                 "-c",
                 (
-                    "import platform, sys;"
+                    "import os, platform, sys;"
                     "print(platform.python_implementation());"
                     "print(platform.sys.version_info);"
-                    "print(sys.version);"
+                    " print(sys.version.split(os.linesep)[0]);"
                     "print(sys.maxsize > 2**32);print(platform.system())"
                 ),
             ]
@@ -81,11 +81,11 @@ class CondaEnvRunner(PythonRun):
 
     @property
     def _package_tox_env_type(self) -> str:
-        raise NotImplementedError
+        return "virtualenv-pep-517"
 
     @property
     def _external_pkg_tox_env_type(self) -> str:
-        raise NotImplementedError
+        return "virtualenv-cmd-builder"
 
     def _get_python_env_version(self):
         # Try to use base_python config
