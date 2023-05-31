@@ -33,6 +33,7 @@ class CondaEnvRunner(PythonRun):
     def __init__(self, create_args: ToxEnvCreateArgs) -> None:
         self._installer = None
         self._executor = None
+        self._external_executor = None
         self._created = False
         super().__init__(create_args)
 
@@ -43,7 +44,7 @@ class CondaEnvRunner(PythonRun):
     def _get_python(self, base_python: List[str]) -> Optional[PythonInfo]:
         exe_path = base_python[0]
 
-        output = subprocess.check_output(
+        output = self._run_pure(
             [
                 exe_path,
                 "-c",
@@ -54,9 +55,10 @@ class CondaEnvRunner(PythonRun):
                     " print(sys.version.split(os.linesep)[0]);"
                     "print(sys.maxsize > 2**32);print(platform.system())"
                 ),
-            ]
+            ],
+            "_get_python",
         )
-        output = output.decode("utf-8").strip().split(os.linesep)
+        output = output.split(os.linesep)
 
         implementation, version_info, version, is_64, platform_name = output
 
@@ -169,9 +171,7 @@ class CondaEnvRunner(PythonRun):
             )
         try:
             create_command_args = shlex.split(create_command)
-            subprocess.run(create_command_args, check=True)
-        except subprocess.CalledProcessError as e:
-            raise Fail(f"Failed to create '{self.env_dir}' conda environment. Error: {e}")
+            self._run_pure(create_command_args, "create_python_env-create")
         finally:
             tear_down()
 
@@ -179,11 +179,8 @@ class CondaEnvRunner(PythonRun):
             conda_exe, python, conda_cache_conf
         )
         if install_command:
-            try:
-                install_command_args = shlex.split(install_command)
-                subprocess.run(install_command_args, check=True)
-            except subprocess.CalledProcessError as e:
-                raise Fail(f"Failed to install dependencies in conda environment. Error: {e}")
+            install_command_args = shlex.split(install_command)
+            self._run_pure(install_command_args, "create_python_env-install")
 
     @staticmethod
     def _generate_env_create_command(
@@ -260,6 +257,12 @@ class CondaEnvRunner(PythonRun):
         return cmd
 
     @property
+    def external_executor(self) -> Execute:
+        if self._external_executor is None:
+            self._external_executor = LocalSubProcessExecutor(self.options.is_colored)
+        return self._external_executor
+
+    @property
     def executor(self) -> Execute:
         def get_conda_command_prefix():
             conda_exe = find_conda()
@@ -311,27 +314,51 @@ class CondaEnvRunner(PythonRun):
 
     def env_site_package_dir(self) -> Path:
         """The site package folder within the tox environment."""
-        cmd = 'from sysconfig import get_paths; print(get_paths()["purelib"])'
-        path = self._call_python_in_conda_env(cmd, "env_site_package_dir")
+        script = 'from sysconfig import get_paths; print(get_paths()["purelib"])'
+        path = self._run_python_script_in_conda(script, "env_site_package_dir")
         return Path(path).resolve()
 
     def env_python(self) -> Path:
         """The python executable within the tox environment."""
-        cmd = "import sys; print(sys.executable)"
-        path = self._call_python_in_conda_env(cmd, "env_python")
+        script = "import sys; print(sys.executable)"
+        path = self._run_in_conda(script, "env_python")
         return Path(path).resolve()
 
     def env_bin_dir(self) -> Path:
         """The binary folder within the tox environment."""
-        cmd = 'from sysconfig import get_paths; print(get_paths()["scripts"])'
-        path = self._call_python_in_conda_env(cmd, "env_bin_dir")
+        script = 'from sysconfig import get_paths; print(get_paths()["scripts"])'
+        path = self._run_in_conda(script, "env_bin_dir")
         return Path(path).resolve()
 
-    def _call_python_in_conda_env(self, cmd: str, run_id: str):
+    def _run_python_script_in_conda(self, script: str, run_id: str):
+        cmd = "python -c".split() + [script]
+        return self._run_in_conda(cmd, run_id)
+
+    def _run_in_conda(self, cmd: List[str], run_id: str):
         self._ensure_python_env_exists()
 
-        python_cmd = "python -c".split()
+        request = ExecuteRequest(
+            cmd,
+            self.conf["change_dir"],
+            self.environment_variables,
+            StdinSource.API,
+            run_id,
+        )
 
+        return self._run_with_executor(self.executor, request)
+
+    def _run_pure(self, cmd: List[str], run_id: str):
+        request = ExecuteRequest(
+            cmd,
+            self.conf["change_dir"],
+            self.environment_variables,
+            StdinSource.API,
+            run_id,
+        )
+
+        return self._run_with_executor(self.external_executor, request)
+
+    def _run_with_executor(self, executor: Execute, request: ExecuteRequest):
         class NamedBytesIO(BytesIO):
             def __init__(self, name):
                 self.name = name
@@ -345,20 +372,13 @@ class CondaEnvRunner(PythonRun):
 
         out_err = out, err
 
-        request = ExecuteRequest(
-            python_cmd + [cmd],
-            self.conf["change_dir"],
-            self.environment_variables,
-            StdinSource.API,
-            run_id,
-        )
-
-        with self.executor.call(request, True, out_err, self) as execute_status:
+        with executor.call(request, True, out_err, self) as execute_status:
             while execute_status.wait() is None:
                 sleep(0.01)
             if execute_status.exit_code != 0:
                 raise Fail(
-                    f"Failed to execute operation '{cmd}'. Stderr: {execute_status.err.decode()}"
+                    f"Failed to execute operation '{request.cmd}'. "
+                    f"Stderr: {execute_status.err.decode()}"
                 )
 
         return execute_status.out.decode().strip()
@@ -374,14 +394,9 @@ class CondaEnvRunner(PythonRun):
 
         conda_exe = find_conda()
         cmd = f"'{conda_exe}' env list --json"
-        try:
-            cmd_list = shlex.split(cmd)
-            result: subprocess.CompletedProcess = subprocess.run(
-                cmd_list, check=True, capture_output=True
-            )
-        except subprocess.CalledProcessError as e:
-            raise Fail(f"Failed to list conda environments. Error: {e}")
-        envs = json.loads(result.stdout.decode())
+        cmd_list = shlex.split(cmd)
+        result = self._run_pure(cmd_list, "_ensure_python_env_exists")
+        envs = json.loads(result)
         if str(self.env_dir) in envs["envs"]:
             self._created = True
         else:
