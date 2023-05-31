@@ -11,7 +11,7 @@ from functools import partial
 from io import BytesIO, TextIOWrapper
 from pathlib import Path
 from time import sleep
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from ruamel.yaml import YAML
 from tox.execute.api import Execute, ExecuteInstance, ExecuteOptions, ExecuteRequest, SyncWrite
@@ -40,7 +40,7 @@ class CondaEnvRunner(PythonRun):
     def id() -> str:  # noqa A003
         return "conda"
 
-    def _get_python(self, base_python: List[str]) -> PythonInfo | None:
+    def _get_python(self, base_python: List[str]) -> Optional[PythonInfo]:
         exe_path = base_python[0]
 
         output = subprocess.check_output(
