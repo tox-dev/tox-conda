@@ -32,10 +32,9 @@ __all__ = []
 class CondaEnvRunner(PythonRun):
     # Can be overridden in tests
     @staticmethod
-    def _execute_instance_factory(request: ExecuteRequest,
-                                    options: ExecuteOptions,
-                                    out: SyncWrite,
-                                    err: SyncWrite):
+    def _execute_instance_factory(
+        request: ExecuteRequest, options: ExecuteOptions, out: SyncWrite, err: SyncWrite
+    ):
         return LocalSubProcessExecuteInstance(request, options, out, err)
 
     _execute_instance_factory: Union[ExecuteInstance, Callable] = _execute_instance_factory

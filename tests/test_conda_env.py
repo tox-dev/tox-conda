@@ -4,26 +4,22 @@ import pathlib
 import re
 import subprocess
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional, Union, Sequence
-from unittest.mock import mock_open, patch
-
-
 from types import ModuleType, TracebackType
+from typing import Any, Callable, Dict, Optional, Sequence, Union
+from unittest.mock import mock_open, patch
 
 import pytest
 import tox
+import tox.run
 from pytest import MonkeyPatch
 from pytest_mock import MockerFixture
 from ruamel.yaml import YAML
-from tox.pytest import CaptureFixture, ToxProject, ToxProjectCreator
-from tox_conda.plugin import CondaEnvRunner
-
-import tox.run
 from tox.config.sets import EnvConfigSet
 from tox.execute.api import Execute, ExecuteInstance, ExecuteOptions, ExecuteStatus, Outcome
 from tox.execute.request import ExecuteRequest, shell_cmd
 from tox.execute.stream import SyncWrite
 from tox.plugin import manager
+from tox.pytest import CaptureFixture, ToxProject, ToxProjectCreator
 from tox.report import LOGGER, OutErr
 from tox.run import run as tox_run
 from tox.run import setup_state as previous_setup_state
@@ -31,6 +27,8 @@ from tox.session.cmd.run.parallel import ENV_VAR_KEY
 from tox.session.state import State
 from tox.tox_env import api as tox_env_api
 from tox.tox_env.api import ToxEnv
+
+from tox_conda.plugin import CondaEnvRunner
 
 # from tox_conda.plugin import tox_testenv_create, tox_testenv_install_deps
 
@@ -52,6 +50,7 @@ def init_fixture(
 
     return _init
 
+
 # class MockExecute(Execute):
 #     def __init__(self, colored: bool, exit_code: int) -> None:
 #         self.exit_code = exit_code
@@ -70,7 +69,9 @@ def init_fixture(
 @pytest.fixture
 def mock_conda_env_runner(request, monkeypatch):
     class MockExecuteStatus(ExecuteStatus):
-        def __init__(self, options: ExecuteOptions, out: SyncWrite, err: SyncWrite, exit_code: int) -> None:
+        def __init__(
+            self, options: ExecuteOptions, out: SyncWrite, err: SyncWrite, exit_code: int
+        ) -> None:
             super().__init__(options, out, err)
             self._exit_code = exit_code
 
@@ -113,30 +114,33 @@ def mock_conda_env_runner(request, monkeypatch):
         @property
         def cmd(self) -> Sequence[str]:
             return self.request.cmd
-    
 
     shell_cmds = []
     mocked_run_ids = request.param
     original_execute_instance_factor = CondaEnvRunner._execute_instance_factory
 
-    def mock_execute_instance_factory(request: ExecuteRequest,
-                                    options: ExecuteOptions,
-                                    out: SyncWrite,
-                                    err: SyncWrite):
+    def mock_execute_instance_factory(
+        request: ExecuteRequest, options: ExecuteOptions, out: SyncWrite, err: SyncWrite
+    ):
         shell_cmds.append(request.cmd)
 
         if request.run_id in mocked_run_ids:
             return MockExecuteInstance(request, options, out, err, 0)
         else:
             return original_execute_instance_factor(request, options, out, err)
-        
+
     # CondaEnvRunner._execute_instance_factory = mock_execute_instance_factory
 
     monkeypatch.setattr(CondaEnvRunner, "_execute_instance_factory", mock_execute_instance_factory)
 
     yield shell_cmds
 
-@pytest.mark.parametrize('mock_conda_env_runner', [["create_python_env-create", "create_python_env-install", "install_package"]], indirect=True)
+
+@pytest.mark.parametrize(
+    "mock_conda_env_runner",
+    [["create_python_env-create", "create_python_env-install", "install_package"]],
+    indirect=True,
+)
 def test_conda_create(tox_project, monkeypatch, mock_conda_env_runner):
     ini = "[testenv:py123]"
     outcome = tox_project({"tox.ini": ini}).run("-e", "py123")
@@ -149,6 +153,7 @@ def test_conda_create(tox_project, monkeypatch, mock_conda_env_runner):
     # result = tox_proj.run("-e", "py123")
     # result.assert_success()
     # assert len(execute_calls) == 2
+
 
 # def test_conda_create(tox_project, monkeypatch):
 #     original_run = CondaEnvRunner._run_with_executor
@@ -164,7 +169,6 @@ def test_conda_create(tox_project, monkeypatch, mock_conda_env_runner):
 #     ini = "[testenv:py123]"
 #     outcome = tox_project({"tox.ini": ini}).run("-e", "py123")
 #     outcome.assert_success()
-
 
 
 # @pytest.fixture
@@ -209,20 +213,20 @@ def test_conda_create(tox_project, monkeypatch, mock_conda_env_runner):
 #     result.assert_success()
 #     assert len(execute_calls) == 2
 
-    # venv = VirtualEnv(config.envconfigs["py123"])
-    # assert venv.path == config.envconfigs["py123"].envdir
+# venv = VirtualEnv(config.envconfigs["py123"])
+# assert venv.path == config.envconfigs["py123"].envdir
 
-    # with mocksession.newaction(venv.name, "getenv") as action:
-    #     tox_testenv_create(action=action, venv=venv)
-    # pcalls = mocksession._pcalls
-    # assert len(pcalls) >= 1
-    # call = pcalls[-1]
-    # assert "conda" in call.args[0]
-    # assert "create" == call.args[1]
-    # assert "--yes" == call.args[2]
-    # assert "-p" == call.args[3]
-    # assert venv.path == call.args[4]
-    # assert call.args[5].startswith("python=")
+# with mocksession.newaction(venv.name, "getenv") as action:
+#     tox_testenv_create(action=action, venv=venv)
+# pcalls = mocksession._pcalls
+# assert len(pcalls) >= 1
+# call = pcalls[-1]
+# assert "conda" in call.args[0]
+# assert "create" == call.args[1]
+# assert "--yes" == call.args[2]
+# assert "-p" == call.args[3]
+# assert venv.path == call.args[4]
+# assert call.args[5].startswith("python=")
 
 
 # def create_test_env(config, mocksession, envname):
