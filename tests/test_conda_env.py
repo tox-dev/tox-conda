@@ -54,6 +54,7 @@ def test_conda_create(tox_project, mock_conda_env_runner):
     assert "--yes" == create_env_cmd[5]
     assert "--quiet" == create_env_cmd[6]
 
+
 def test_install_deps_no_conda(tox_project, mock_conda_env_runner):
     env_name = "py123"
     ini = f"""
@@ -77,7 +78,9 @@ def test_install_deps_no_conda(tox_project, mock_conda_env_runner):
     cmd_conda_prefix = " ".join(cmd[:5])
     cmd_pip_install = " ".join(cmd[5:])
 
-    assert cmd_conda_prefix.endswith(f"conda run -p {str(proj.path / '.tox' / env_name)} --live-stream")
+    assert cmd_conda_prefix.endswith(
+        f"conda run -p {str(proj.path / '.tox' / env_name)} --live-stream"
+    )
 
     assert cmd_pip_install.startswith("python -I -m pip install")
     assert "numpy" in cmd_pip_install
@@ -106,7 +109,9 @@ def test_install_conda_no_pip(tox_project, mock_conda_env_runner):
     cmd_conda_prefix = " ".join(cmd[:6])
     cmd_packages = " ".join(cmd[6:])
 
-    assert cmd_conda_prefix.endswith(f"conda install --quiet --yes -p {str(proj.path / '.tox' / env_name)}")
+    assert cmd_conda_prefix.endswith(
+        f"conda install --quiet --yes -p {str(proj.path / '.tox' / env_name)}"
+    )
 
     assert "asdf" in cmd_packages
     assert "pytest" in cmd_packages
@@ -140,6 +145,7 @@ def test_install_conda_with_deps(tox_project, mock_conda_env_runner):
 
     assert "conda install --quiet --yes -p" in cmd_conda
     assert "python -I -m pip install" in pip_cmd
+
 
 # def test_update(tmpdir, newconfig, mocksession):
 #     pkg = tmpdir.ensure("package.tar.gz")

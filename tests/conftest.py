@@ -50,6 +50,7 @@ def init_fixture(
 
     return _init
 
+
 @pytest.fixture
 def mock_conda_env_runner(request, monkeypatch):
     class MockExecuteStatus(ExecuteStatus):
@@ -100,7 +101,7 @@ def mock_conda_env_runner(request, monkeypatch):
             return self.request.cmd
 
     shell_cmds = []
-    no_mocked_run_ids = getattr(request, 'param', None)
+    no_mocked_run_ids = getattr(request, "param", None)
     if no_mocked_run_ids is None:
         no_mocked_run_ids = ["_get_python"]
     original_execute_instance_factor = CondaEnvRunner._execute_instance_factory
@@ -118,4 +119,3 @@ def mock_conda_env_runner(request, monkeypatch):
     monkeypatch.setattr(CondaEnvRunner, "_execute_instance_factory", mock_execute_instance_factory)
 
     yield shell_cmds
-
