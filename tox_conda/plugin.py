@@ -11,7 +11,7 @@ from functools import partial
 from io import BytesIO, TextIOWrapper
 from pathlib import Path
 from time import sleep
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Union
 
 from ruamel.yaml import YAML
 from tox.execute.api import Execute, ExecuteInstance, ExecuteOptions, ExecuteRequest, SyncWrite
@@ -30,6 +30,16 @@ __all__ = []
 
 
 class CondaEnvRunner(PythonRun):
+    # Can be overridden in tests
+    @staticmethod
+    def _execute_instance_factory(request: ExecuteRequest,
+                                    options: ExecuteOptions,
+                                    out: SyncWrite,
+                                    err: SyncWrite):
+        return LocalSubProcessExecuteInstance(request, options, out, err)
+
+    _execute_instance_factory: Union[ExecuteInstance, Callable] = _execute_instance_factory
+
     def __init__(self, create_args: ToxEnvCreateArgs) -> None:
         self._installer = None
         self._executor = None
@@ -258,8 +268,18 @@ class CondaEnvRunner(PythonRun):
 
     @property
     def external_executor(self) -> Execute:
+        class CondaExecutor(LocalSubProcessExecutor):
+            def build_instance(
+                self,
+                request: ExecuteRequest,
+                options: ExecuteOptions,
+                out: SyncWrite,
+                err: SyncWrite,
+            ) -> ExecuteInstance:
+                return CondaEnvRunner._execute_instance_factory(request, options, out, err)
+
         if self._external_executor is None:
-            self._external_executor = LocalSubProcessExecutor(self.options.is_colored)
+            self._external_executor = CondaExecutor(self.options.is_colored)
         return self._external_executor
 
     @property
@@ -291,7 +311,9 @@ class CondaEnvRunner(PythonRun):
                     request.run_id,
                     request.allow,
                 )
-                return LocalSubProcessExecuteInstance(conda_request, options, out, err)
+                # This creates a LocalSubProcessExecuteInstance in real environment,
+                # and it allows testing with dependency injection.
+                return CondaEnvRunner._execute_instance_factory(conda_request, options, out, err)
 
         if self._executor is None:
             self._executor = CondaExecutor(self.options.is_colored)
@@ -345,7 +367,7 @@ class CondaEnvRunner(PythonRun):
             run_id,
         )
 
-        return self._run_with_executor(self.executor, request)
+        return self._call_executor(self.executor, request)
 
     def _run_pure(self, cmd: List[str], run_id: str):
         request = ExecuteRequest(
@@ -356,9 +378,9 @@ class CondaEnvRunner(PythonRun):
             run_id,
         )
 
-        return self._run_with_executor(self.external_executor, request)
+        return self._call_executor(self.external_executor, request)
 
-    def _run_with_executor(self, executor: Execute, request: ExecuteRequest):
+    def _call_executor(self, executor: Execute, request: ExecuteRequest):
         class NamedBytesIO(BytesIO):
             def __init__(self, name):
                 self.name = name
@@ -401,8 +423,8 @@ class CondaEnvRunner(PythonRun):
             self._created = True
         else:
             raise Fail(
-                f"{self.env_dir} already exists, but it is not a conda environment. Delete in"
-                " manually first."
+                f"{self.env_dir} already exists, but it is not a conda environment. "
+                "Delete it first manually."
             )
 
 
