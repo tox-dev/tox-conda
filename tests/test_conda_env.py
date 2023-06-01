@@ -51,65 +51,64 @@ def test_conda_create(tox_project, mock_conda_env_runner):
     assert "--yes" == create_env_cmd[5]
     assert "--quiet" == create_env_cmd[6]
 
-# def create_test_env(config, mocksession, envname):
+def test_install_deps_no_conda(tox_project, mock_conda_env_runner):
+    """Test installation using conda when no conda_deps are given"""
+    env_name = "py123"
+    ini = f"""
+        [testenv:{env_name}]
+        deps =
+            numpy
+            -r requirements.txt
+            astropy
+    """
+    proj = tox_project({"tox.ini": ini})
+    (proj.path / "requirements.txt").touch()
 
-#     venv = VirtualEnv(config.envconfigs[envname])
-#     with mocksession.newaction(venv.name, "getenv") as action:
-#         tox_testenv_create(action=action, venv=venv)
-#     pcalls = mocksession._pcalls
-#     assert len(pcalls) >= 1
-#     pcalls[:] = []
+    outcome = proj.run("-e", "py123")
+    outcome.assert_success()
 
-#     return venv, action, pcalls
+    executed_shell_commands = mock_conda_env_runner
+    assert len(executed_shell_commands) == 4
 
+    cmd = executed_shell_commands[2]
+    cmd_conda_prefix = " ".join(cmd[:5])
+    cmd_pip_install = " ".join(cmd[5:])
 
-# def test_install_deps_no_conda(newconfig, mocksession, monkeypatch):
-#     """Test installation using conda when no conda_deps are given"""
-#     # No longer remove the temporary script, so we can check its contents.
-#     monkeypatch.delattr(PopenInActivatedEnv, "__del__", raising=False)
+    assert f"conda run -p {str(proj.path / '.tox' / env_name)} --live-stream" in cmd_conda_prefix
 
-#     env_name = "py123"
-#     config = newconfig(
-#         [],
-#         """
-#         [testenv:{}]
-#         deps=
-#             numpy
-#             -r requirements.txt
-#             astropy
-#     """.format(
-#             env_name
-#         ),
-#     )
+    assert cmd_pip_install.startswith("python -I -m pip install")
+    assert "numpy" in cmd_pip_install
+    assert "astropy" in cmd_pip_install
+    assert "-r requirements.txt" in cmd_pip_install
 
-#     config.toxinidir.join("requirements.txt").write("")
+    # config.toxinidir.join("requirements.txt").write("")
 
-#     venv, action, pcalls = create_test_env(config, mocksession, env_name)
+    # venv, action, pcalls = create_test_env(config, mocksession, env_name)
 
-#     assert len(venv.envconfig.deps) == 3
-#     assert len(venv.envconfig.conda_deps) == 0
+    # assert len(venv.envconfig.deps) == 3
+    # assert len(venv.envconfig.conda_deps) == 0
 
-#     tox_testenv_install_deps(action=action, venv=venv)
+    # tox_testenv_install_deps(action=action, venv=venv)
 
-#     assert len(pcalls) >= 1
+    # assert len(pcalls) >= 1
 
-#     call = pcalls[-1]
+    # call = pcalls[-1]
 
-#     if tox.INFO.IS_WIN:
-#         script_lines = " ".join(call.args).split(" && ", maxsplit=1)
-#         pattern = r"conda\.bat activate .*{}".format(re.escape(env_name))
-#     else:
-#         # Get the cmd args from the script.
-#         shell, cmd_script = call.args
-#         assert shell == "/bin/sh"
-#         with open(cmd_script) as stream:
-#             script_lines = stream.readlines()
-#         pattern = r"eval \"\$\(/.*/conda shell\.posix activate /.*/{}\)\"".format(env_name)
+    # if tox.INFO.IS_WIN:
+    #     script_lines = " ".join(call.args).split(" && ", maxsplit=1)
+    #     pattern = r"conda\.bat activate .*{}".format(re.escape(env_name))
+    # else:
+    #     # Get the cmd args from the script.
+    #     shell, cmd_script = call.args
+    #     assert shell == "/bin/sh"
+    #     with open(cmd_script) as stream:
+    #         script_lines = stream.readlines()
+    #     pattern = r"eval \"\$\(/.*/conda shell\.posix activate /.*/{}\)\"".format(env_name)
 
-#     assert re.match(pattern, script_lines[0])
+    # assert re.match(pattern, script_lines[0])
 
-#     cmd = script_lines[1].split()
-#     assert cmd[-6:] == ["-m", "pip", "install", "numpy", "-rrequirements.txt", "astropy"]
+    # cmd = script_lines[1].split()
+    # assert cmd[-6:] == ["-m", "pip", "install", "numpy", "-rrequirements.txt", "astropy"]
 
 
 # def test_install_conda_deps(newconfig, mocksession):
