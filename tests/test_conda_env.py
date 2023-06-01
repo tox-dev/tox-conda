@@ -32,14 +32,17 @@ from tox_conda.plugin import CondaEnvRunner
 
 
 def test_conda_create(tox_project, mock_conda_env_runner):
-    ini = "[testenv:py123]"
+    ini = """
+    [testenv:py123]
+    skip_install = True
+    """
     proj = tox_project({"tox.ini": ini})
 
     outcome = proj.run("-e", "py123")
     outcome.assert_success()
 
     executed_shell_commands = mock_conda_env_runner
-    assert len(executed_shell_commands) == 3
+    assert len(executed_shell_commands) == 2
 
     create_env_cmd = executed_shell_commands[1]
 
@@ -52,10 +55,10 @@ def test_conda_create(tox_project, mock_conda_env_runner):
     assert "--quiet" == create_env_cmd[6]
 
 def test_install_deps_no_conda(tox_project, mock_conda_env_runner):
-    """Test installation using conda when no conda_deps are given"""
     env_name = "py123"
     ini = f"""
         [testenv:{env_name}]
+        skip_install = True
         deps =
             numpy
             -r requirements.txt
@@ -68,107 +71,75 @@ def test_install_deps_no_conda(tox_project, mock_conda_env_runner):
     outcome.assert_success()
 
     executed_shell_commands = mock_conda_env_runner
-    assert len(executed_shell_commands) == 4
+    assert len(executed_shell_commands) == 3
 
     cmd = executed_shell_commands[2]
     cmd_conda_prefix = " ".join(cmd[:5])
     cmd_pip_install = " ".join(cmd[5:])
 
-    assert f"conda run -p {str(proj.path / '.tox' / env_name)} --live-stream" in cmd_conda_prefix
+    assert cmd_conda_prefix.endswith(f"conda run -p {str(proj.path / '.tox' / env_name)} --live-stream")
 
     assert cmd_pip_install.startswith("python -I -m pip install")
     assert "numpy" in cmd_pip_install
     assert "astropy" in cmd_pip_install
     assert "-r requirements.txt" in cmd_pip_install
 
-    # config.toxinidir.join("requirements.txt").write("")
 
-    # venv, action, pcalls = create_test_env(config, mocksession, env_name)
+def test_install_conda_no_pip(tox_project, mock_conda_env_runner):
+    env_name = "py123"
+    ini = f"""
+        [testenv:{env_name}]
+        skip_install = True
+        conda_deps =
+            pytest
+            asdf
+    """
+    proj = tox_project({"tox.ini": ini})
 
-    # assert len(venv.envconfig.deps) == 3
-    # assert len(venv.envconfig.conda_deps) == 0
+    outcome = proj.run("-e", "py123")
+    outcome.assert_success()
 
-    # tox_testenv_install_deps(action=action, venv=venv)
+    executed_shell_commands = mock_conda_env_runner
+    assert len(executed_shell_commands) == 3
 
-    # assert len(pcalls) >= 1
+    cmd = executed_shell_commands[2]
+    cmd_conda_prefix = " ".join(cmd[:6])
+    cmd_packages = " ".join(cmd[6:])
 
-    # call = pcalls[-1]
+    assert cmd_conda_prefix.endswith(f"conda install --quiet --yes -p {str(proj.path / '.tox' / env_name)}")
 
-    # if tox.INFO.IS_WIN:
-    #     script_lines = " ".join(call.args).split(" && ", maxsplit=1)
-    #     pattern = r"conda\.bat activate .*{}".format(re.escape(env_name))
-    # else:
-    #     # Get the cmd args from the script.
-    #     shell, cmd_script = call.args
-    #     assert shell == "/bin/sh"
-    #     with open(cmd_script) as stream:
-    #         script_lines = stream.readlines()
-    #     pattern = r"eval \"\$\(/.*/conda shell\.posix activate /.*/{}\)\"".format(env_name)
-
-    # assert re.match(pattern, script_lines[0])
-
-    # cmd = script_lines[1].split()
-    # assert cmd[-6:] == ["-m", "pip", "install", "numpy", "-rrequirements.txt", "astropy"]
-
-
-# def test_install_conda_deps(newconfig, mocksession):
-#     config = newconfig(
-#         [],
-#         """
-#         [testenv:py123]
-#         deps=
-#             numpy
-#             astropy
-#         conda_deps=
-#             pytest
-#             asdf
-#     """,
-#     )
-
-#     venv, action, pcalls = create_test_env(config, mocksession, "py123")
-
-#     assert len(venv.envconfig.conda_deps) == 2
-#     assert len(venv.envconfig.deps) == 2 + len(venv.envconfig.conda_deps)
-
-#     tox_testenv_install_deps(action=action, venv=venv)
-#     # We expect two calls: one for conda deps, and one for pip deps
-#     assert len(pcalls) >= 2
-#     call = pcalls[-2]
-#     conda_cmd = call.args
-#     assert "conda" in os.path.split(conda_cmd[0])[-1]
-#     assert conda_cmd[1:6] == ["install", "--quiet", "--yes", "-p", venv.path]
-#     # Make sure that python is explicitly given as part of every conda install
-#     # in order to avoid inadvertent upgrades of python itself.
-#     assert conda_cmd[6].startswith("python=")
-#     assert conda_cmd[7:9] == ["pytest", "asdf"]
+    assert "asdf" in cmd_packages
+    assert "pytest" in cmd_packages
+    # Make sure that python is explicitly given as part of every conda install
+    # in order to avoid inadvertent upgrades of python itself.
+    assert "python=" in cmd_packages
 
 
-# def test_install_conda_no_pip(newconfig, mocksession):
-#     config = newconfig(
-#         [],
-#         """
-#         [testenv:py123]
-#         conda_deps=
-#             pytest
-#             asdf
-#     """,
-#     )
+def test_install_conda_with_deps(tox_project, mock_conda_env_runner):
+    env_name = "py123"
+    ini = f"""
+        [testenv:{env_name}]
+        skip_install = True
+        deps =
+            numpy
+            astropy
+        conda_deps =
+            pytest
+            asdf
+    """
+    proj = tox_project({"tox.ini": ini})
 
-#     venv, action, pcalls = create_test_env(config, mocksession, "py123")
+    outcome = proj.run("-e", "py123")
+    outcome.assert_success()
 
-#     assert len(venv.envconfig.conda_deps) == 2
-#     assert len(venv.envconfig.deps) == len(venv.envconfig.conda_deps)
+    executed_shell_commands = mock_conda_env_runner
+    assert len(executed_shell_commands) == 4
 
-#     tox_testenv_install_deps(action=action, venv=venv)
-#     # We expect only one call since there are no true pip dependencies
-#     assert len(pcalls) >= 1
+    cmd_conda = " ".join(executed_shell_commands[2])
+    pip_cmd = " ".join(executed_shell_commands[3])
 
-#     # Just a quick sanity check for the conda install command
-#     call = pcalls[-1]
-#     conda_cmd = call.args
-#     assert "conda" in os.path.split(conda_cmd[0])[-1]
-#     assert conda_cmd[1:6] == ["install", "--quiet", "--yes", "-p", venv.path]
-
+    assert "conda install --quiet --yes -p" in cmd_conda
+    assert "python -I -m pip install" in pip_cmd
 
 # def test_update(tmpdir, newconfig, mocksession):
 #     pkg = tmpdir.ensure("package.tar.gz")
