@@ -11,7 +11,7 @@ from functools import partial
 from io import BytesIO, TextIOWrapper
 from pathlib import Path
 from time import sleep
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional
 
 from ruamel.yaml import YAML
 from tox.execute.api import Execute, ExecuteInstance, ExecuteOptions, ExecuteRequest, SyncWrite
@@ -211,7 +211,10 @@ class CondaEnvRunner(PythonRun):
         yaml.dump(env_file, tmp_env_file)
         tmp_env_file.close()
 
-        cmd = f"'{conda_exe}' env create {conda_cache_conf['env_spec']} '{conda_cache_conf['env']}' --file '{tmp_env_file.name}' --quiet --force"
+        cmd = (
+            f"'{conda_exe}' env create {conda_cache_conf['env_spec']} '{conda_cache_conf['env']}'"
+            f" --file '{tmp_env_file.name}' --quiet --force"
+        )
 
         def tear_down():
             return Path(tmp_env_file.name).unlink()

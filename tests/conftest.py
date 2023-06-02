@@ -1,38 +1,16 @@
-import io
-import os
-import pathlib
-import re
-import subprocess
 from pathlib import Path
-from types import ModuleType, TracebackType
-from typing import Any, Callable, Dict, Optional, Sequence, Union
-from unittest.mock import mock_open, patch
+from types import TracebackType
+from typing import Any, Dict, Optional, Sequence
 
 import pytest
-import tox
-import tox.run
 from pytest import MonkeyPatch
 from pytest_mock import MockerFixture
-from ruamel.yaml import YAML
-from tox.config.sets import EnvConfigSet
-from tox.execute.api import Execute, ExecuteInstance, ExecuteOptions, ExecuteStatus, Outcome
-from tox.execute.request import ExecuteRequest, shell_cmd
+from tox.execute.api import ExecuteInstance, ExecuteOptions, ExecuteStatus
+from tox.execute.request import ExecuteRequest
 from tox.execute.stream import SyncWrite
-from tox.plugin import manager
 from tox.pytest import CaptureFixture, ToxProject, ToxProjectCreator
-from tox.report import LOGGER, OutErr
-from tox.run import run as tox_run
-from tox.run import setup_state as previous_setup_state
-from tox.session.cmd.run.parallel import ENV_VAR_KEY
-from tox.session.state import State
-from tox.tox_env import api as tox_env_api
-from tox.tox_env.api import ToxEnv
 
 from tox_conda.plugin import CondaEnvRunner
-
-# from tox_conda.plugin import tox_testenv_create, tox_testenv_install_deps
-
-# pytest_plugins = "tox.pytest"
 
 
 @pytest.fixture(name="tox_project")

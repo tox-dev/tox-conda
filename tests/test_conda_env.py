@@ -45,7 +45,10 @@ def test_conda_create_with_package_install(tox_project, mock_conda_env_runner):
     )
     assert fnmatch(
         pip_install_command,
-        f"*conda run -p {str(proj.path / '.tox' / 'py123')} --live-stream python -I -m pip install*",
+        (
+            f"*conda run -p {str(proj.path / '.tox' / 'py123')} --live-stream"
+            " python -I -m pip install*"
+        ),
     )
 
 
@@ -62,7 +65,7 @@ def test_conda_create_with_name(tox_project, mock_conda_env_runner):
 
     executed_shell_commands = mock_conda_env_runner
     assert len(executed_shell_commands) == 2
-    assert fnmatch(executed_shell_commands[1], f"*conda create -n myenv python=* --yes --quiet*")
+    assert fnmatch(executed_shell_commands[1], "*conda create -n myenv python=* --yes --quiet*")
 
 
 def test_install_deps_no_conda(tox_project, mock_conda_env_runner):
@@ -87,7 +90,10 @@ def test_install_deps_no_conda(tox_project, mock_conda_env_runner):
     pip_install_command = executed_shell_commands[2]
     assert fnmatch(
         pip_install_command,
-        f"*conda run -p {str(proj.path / '.tox' / env_name)} --live-stream python -I -m pip install*",
+        (
+            f"*conda run -p {str(proj.path / '.tox' / env_name)} --live-stream"
+            " python -I -m pip install*"
+        ),
     )
     assert "numpy" in pip_install_command
     assert "astropy" in pip_install_command
@@ -217,7 +223,10 @@ def test_conda_env(tmp_path, tox_project, mock_conda_env_runner):
     assert len(executed_shell_commands) == 2
     assert fnmatch(
         executed_shell_commands[1],
-        f"*conda env create -p {str(proj.path / '.tox' / 'py123')} --file {str(mock_temp_file)} --quiet --force",
+        (
+            f"*conda env create -p {str(proj.path / '.tox' / 'py123')} "
+            f" --file {str(mock_temp_file)} --quiet --force"
+        ),
     )
 
     # Check that the temporary file has the correct contents
@@ -257,8 +266,8 @@ def test_conda_env_and_spec(tox_project, mock_conda_env_runner):
 
     create_env_cmd = executed_shell_commands[1]
     install_cmd = executed_shell_commands[2]
-    assert fnmatch(create_env_cmd, f"*conda env create*")
-    assert fnmatch(install_cmd, f"*conda install*")
+    assert fnmatch(create_env_cmd, "*conda env create*")
+    assert fnmatch(install_cmd, "*conda install*")
     assert "--file=conda_spec.txt" in install_cmd
 
 
@@ -281,7 +290,7 @@ def test_conda_install_args(tox_project, mock_conda_env_runner):
     assert len(executed_shell_commands) == 3
 
     install_cmd = executed_shell_commands[2]
-    assert fnmatch(install_cmd, f"*conda install*")
+    assert fnmatch(install_cmd, "*conda install*")
     assert "--override-channels" in install_cmd
 
 
@@ -302,5 +311,5 @@ def test_conda_create_args(tox_project, mock_conda_env_runner):
     assert len(executed_shell_commands) == 2
 
     create_cmd = executed_shell_commands[1]
-    assert fnmatch(create_cmd, f"*conda create*")
+    assert fnmatch(create_cmd, "*conda create*")
     assert "--override-channels" in create_cmd

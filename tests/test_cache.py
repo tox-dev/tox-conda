@@ -30,7 +30,7 @@ def test_conda_no_recreate(tox_project, mock_conda_env_runner):
            - pip:
              - pytest
         """
-    for i in range(2):
+    for _ in range(2):
         proj = tox_project({"tox.ini": ini})
         (proj.path / "conda-env.yml").write_text(yaml)
         outcome = proj.run("-e", "py123")
@@ -169,18 +169,6 @@ def test_conda_recreate_by_spec_file_path_change(tox_project, mock_conda_env_run
         skip_install = True
         conda_spec = conda_spec-2.txt
     """
-    yaml = """
-         name: tox-conda
-         channels:
-           - conda-forge
-           - nodefaults
-         dependencies:
-           - numpy
-           - astropy
-           - pip:
-             - pytest
-        """
-
     proj_1 = tox_project({"tox.ini": ini})
     (proj_1.path / "conda_spec-1.txt").touch()
     outcome = proj_1.run("-e", "py123")
