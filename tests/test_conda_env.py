@@ -200,8 +200,6 @@ def test_conda_env(tmp_path, tox_project, mock_conda_env_runner):
         """
     proj = tox_project({"tox.ini": ini})
     (proj.path / "conda-env.yml").write_text(yaml)
-
-    mock_file = mock_open()
     
     mock_temp_file = tmp_path / "mock_temp_file.yml"
     def open_mock_temp_file(*args, **kwargs):
@@ -235,78 +233,45 @@ def test_conda_env(tmp_path, tox_project, mock_conda_env_runner):
     assert tmp_env["dependencies"][-1].startswith("python=")
 
 
-# def test_conda_env_and_spec(tmpdir, newconfig, mocksession):
-#     """Test environment creation when conda_env and conda_spec are given"""
-#     yml = tmpdir.join("conda-env.yml")
-#     yml.write(
-#         """
-#         name: tox-conda
-#         channels:
-#           - conda-forge
-#           - nodefaults
-#         dependencies:
-#           - numpy
-#           - astropy
-#         """
-#     )
-#     txt = tmpdir.join("conda-spec.txt")
-#     txt.write(
-#         """
-#         pytest
-#         """
-#     )
-#     config = newconfig(
-#         [],
-#         """
-#         [testenv:py123]
-#         conda_env={}
-#         conda_spec={}
-#         """.format(
-#             str(yml), str(txt)
-#         ),
-#     )
-#     venv, action, pcalls = create_test_env(config, mocksession, "py123")
+def test_conda_env_and_spec(tmp_path, tox_project, mock_conda_env_runner):
+    env_name = "py123"
+    ini = f"""
+        [testenv:{env_name}]
+        skip_install = True
+        conda_env = conda-env.yml
+        conda_spec = conda_spec.txt
+    """
+    yaml = """
+         name: tox-conda
+         channels:
+           - conda-forge
+           - nodefaults
+         dependencies:
+           - numpy
+           - astropy
+           - pip:
+             - pytest
+        """
+    proj = tox_project({"tox.ini": ini})
+    (proj.path / "conda-env.yml").write_text(yaml)
+    (proj.path / "conda_spec.txt").touch()
+  
+    outcome = proj.run("-e", "py123")
+    outcome.assert_success()
 
-#     assert venv.envconfig.conda_env
-#     assert venv.envconfig.conda_spec
+    executed_shell_commands = mock_conda_env_runner
+    assert len(executed_shell_commands) == 3
 
-#     mock_file = mock_open()
-#     with patch("tox_conda.plugin.tempfile.NamedTemporaryFile", mock_file):
-#         with patch.object(pathlib.Path, "unlink", autospec=True) as mock_unlink:
-#             with mocksession.newaction(venv.name, "getenv") as action:
-#                 tox_testenv_create(action=action, venv=venv)
-#                 mock_unlink.assert_called_once
+    create_env_cmd = executed_shell_commands[1]
+    install_cmd = executed_shell_commands[2]
 
-#     mock_file.assert_called_with(dir=tmpdir, prefix="tox_conda_tmp", suffix=".yaml", delete=False)
+    assert "conda" in create_env_cmd[0]
+    assert "env" == create_env_cmd[1]
+    assert "create" == create_env_cmd[2]
 
-#     pcalls = mocksession._pcalls
-#     assert len(pcalls) >= 1
-#     call = pcalls[-1]
-#     cmd = call.args
-#     assert "conda" in os.path.split(cmd[0])[-1]
-#     assert cmd[1:4] == ["env", "create", "-p"]
-#     assert venv.path == call.args[4]
-#     assert call.args[5].startswith("--file")
-#     assert cmd[6] == str(mock_file().name)
-
-#     yaml = YAML()
-#     tmp_env = yaml.load(mock_open_to_string(mock_file))
-#     assert tmp_env["dependencies"][-1].startswith("python=")
-
-#     with mocksession.newaction(venv.name, "getenv") as action:
-#         tox_testenv_install_deps(action=action, venv=venv)
-#     pcalls = mocksession._pcalls
-#     # We expect conda_spec to be appended to conda deps install
-#     assert len(pcalls) >= 1
-#     call = pcalls[-1]
-#     conda_cmd = call.args
-#     assert "conda" in os.path.split(conda_cmd[0])[-1]
-#     assert conda_cmd[1:6] == ["install", "--quiet", "--yes", "-p", venv.path]
-#     # Make sure that python is explicitly given as part of every conda install
-#     # in order to avoid inadvertent upgrades of python itself.
-#     assert conda_cmd[6].startswith("python=")
-#     assert conda_cmd[-1].startswith("--file")
-#     assert conda_cmd[-1].endswith("conda-spec.txt")
+    assert "conda" in install_cmd[0]
+    assert "install" == install_cmd[1]
+    assert "--file=conda_spec.txt" in install_cmd
 
 
 # def test_conda_install_args(newconfig, mocksession):
