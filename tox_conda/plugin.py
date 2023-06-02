@@ -127,10 +127,9 @@ class CondaEnvRunner(PythonRun):
             conda_dict["env_spec"] = "-n"
             conda_dict["env"] = conda_name
         elif self.conf["conda_env"]:
-            conda_dict["env_spec"] = "-n"
+            conda_dict["env_spec"] = "-p"
+            conda_dict["env"] = str(self.env_dir)
             env_path = Path(self.conf["conda_env"]).resolve()
-            env_file = YAML().load(env_path)
-            conda_dict["env"] = env_file["name"]
             conda_dict["env_path"] = str(env_path)
             conda_dict["env_hash"] = hash_file(Path(self.conf["conda_env"]).resolve())
         else:
@@ -206,13 +205,13 @@ class CondaEnvRunner(PythonRun):
         tmp_env_file = tempfile.NamedTemporaryFile(
             dir=env_path.parent,
             prefix="tox_conda_tmp",
-            suffix=".yaml",
+            suffix=env_path.suffix,
             delete=False,
         )
         yaml.dump(env_file, tmp_env_file)
         tmp_env_file.close()
 
-        cmd = f"'{conda_exe}' env create --file '{tmp_env_file.name}' --quiet --force"
+        cmd = f"'{conda_exe}' env create {conda_cache_conf['env_spec']} '{conda_cache_conf['env']}' --file '{tmp_env_file.name}' --quiet --force"
 
         def tear_down():
             return Path(tmp_env_file.name).unlink()

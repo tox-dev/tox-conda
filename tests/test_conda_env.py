@@ -8,6 +8,7 @@ from types import ModuleType, TracebackType
 from typing import Any, Callable, Dict, Optional, Sequence, Union
 from unittest.mock import mock_open, patch
 
+from fnmatch import fnmatch
 import pytest
 import tox
 import tox.run
@@ -179,124 +180,59 @@ def test_conda_spec(tox_project, mock_conda_env_runner):
     assert "python=" in cmd_packages
     assert "--file=conda_spec.txt" in cmd_packages
 
-# def test_conda_spec(tmpdir, newconfig, mocksession):
-#     """Test environment creation when conda_spec given"""
-#     txt = tmpdir.join("conda-spec.txt")
-#     txt.write(
-#         """
-#         pytest
-#         """
-#     )
-#     config = newconfig(
-#         [],
-#         """
-#         [testenv:py123]
-#         conda_deps=
-#             numpy
-#             astropy
-#         conda_spec={}
-#         """.format(
-#             str(txt)
-#         ),
-#     )
-#     venv, action, pcalls = create_test_env(config, mocksession, "py123")
+def test_conda_env(tmp_path, tox_project, mock_conda_env_runner):
+    env_name = "py123"
+    ini = f"""
+        [testenv:{env_name}]
+        skip_install = True
+        conda_env = conda-env.yml
+    """
+    yaml = """
+         name: tox-conda
+         channels:
+           - conda-forge
+           - nodefaults
+         dependencies:
+           - numpy
+           - astropy
+           - pip:
+             - pytest
+        """
+    proj = tox_project({"tox.ini": ini})
+    (proj.path / "conda-env.yml").write_text(yaml)
 
-#     assert venv.envconfig.conda_spec
-#     assert len(venv.envconfig.conda_deps) == 2
+    mock_file = mock_open()
+    
+    mock_temp_file = tmp_path / "mock_temp_file.yml"
+    def open_mock_temp_file(*args, **kwargs):
+        return mock_temp_file.open("w")
 
-#     tox_testenv_install_deps(action=action, venv=venv)
-#     # We expect conda_spec to be appended to conda deps install
-#     assert len(pcalls) >= 1
-#     call = pcalls[-1]
-#     conda_cmd = call.args
-#     assert "conda" in os.path.split(conda_cmd[0])[-1]
-#     assert conda_cmd[1:6] == ["install", "--quiet", "--yes", "-p", venv.path]
-#     # Make sure that python is explicitly given as part of every conda install
-#     # in order to avoid inadvertent upgrades of python itself.
-#     assert conda_cmd[6].startswith("python=")
-#     assert conda_cmd[7:9] == ["numpy", "astropy"]
-#     assert conda_cmd[-1].startswith("--file")
-#     assert conda_cmd[-1].endswith("conda-spec.txt")
+    with patch("tox_conda.plugin.tempfile.NamedTemporaryFile", open_mock_temp_file):
+        with patch.object(pathlib.Path, "unlink", autospec=True) as mock_unlink:
+            outcome = proj.run("-e", "py123")
+            outcome.assert_success()
 
+            mock_unlink.assert_called_once
+   
+    executed_shell_commands = mock_conda_env_runner
+    assert len(executed_shell_commands) == 2
 
-# def test_empty_conda_spec_and_env(tmpdir, newconfig, mocksession):
-#     """Test environment creation when empty conda_spec and conda_env."""
-#     txt = tmpdir.join("conda-spec.txt")
-#     txt.write(
-#         """
-#         pytest
-#         """
-#     )
-#     config = newconfig(
-#         [],
-#         """
-#         [testenv:py123]
-#         conda_env=
-#           foo: path-to.yml
-#         conda_spec=
-#           foo: path-to.yml
-#         """,
-#     )
-#     venv, _, _ = create_test_env(config, mocksession, "py123")
+    create_env_cmd = executed_shell_commands[1]
 
-#     assert venv.envconfig.conda_spec is None
-#     assert venv.envconfig.conda_env is None
+    assert "conda" in create_env_cmd[0]
+    assert "env" == create_env_cmd[1]
+    assert "create" == create_env_cmd[2]
+    assert "-p" == create_env_cmd[3]
+    assert str(proj.path / ".tox" / "py123") == create_env_cmd[4]
+    assert "--file" == create_env_cmd[5]
+    assert str(mock_temp_file) == create_env_cmd[6]
+    assert "--quiet" == create_env_cmd[7]
+    assert "--force" == create_env_cmd[8]
 
-
-# def test_conda_env(tmpdir, newconfig, mocksession):
-#     """Test environment creation when conda_env given"""
-#     yml = tmpdir.join("conda-env.yml")
-#     yml.write(
-#         """
-#         name: tox-conda
-#         channels:
-#           - conda-forge
-#           - nodefaults
-#         dependencies:
-#           - numpy
-#           - astropy
-#           - pip:
-#             - pytest
-#         """
-#     )
-#     config = newconfig(
-#         [],
-#         """
-#         [testenv:py123]
-#         conda_env={}
-#         """.format(
-#             str(yml)
-#         ),
-#     )
-
-#     venv = VirtualEnv(config.envconfigs["py123"])
-#     assert venv.path == config.envconfigs["py123"].envdir
-
-#     venv, action, pcalls = create_test_env(config, mocksession, "py123")
-#     assert venv.envconfig.conda_env
-
-#     mock_file = mock_open()
-#     with patch("tox_conda.plugin.tempfile.NamedTemporaryFile", mock_file):
-#         with patch.object(pathlib.Path, "unlink", autospec=True) as mock_unlink:
-#             with mocksession.newaction(venv.name, "getenv") as action:
-#                 tox_testenv_create(action=action, venv=venv)
-#                 mock_unlink.assert_called_once
-
-#     mock_file.assert_called_with(dir=tmpdir, prefix="tox_conda_tmp", suffix=".yaml", delete=False)
-
-#     pcalls = mocksession._pcalls
-#     assert len(pcalls) >= 1
-#     call = pcalls[-1]
-#     cmd = call.args
-#     assert "conda" in os.path.split(cmd[0])[-1]
-#     assert cmd[1:4] == ["env", "create", "-p"]
-#     assert venv.path == call.args[4]
-#     assert call.args[5].startswith("--file")
-#     assert cmd[6] == str(mock_file().name)
-
-#     yaml = YAML()
-#     tmp_env = yaml.load(mock_open_to_string(mock_file))
-#     assert tmp_env["dependencies"][-1].startswith("python=")
+    # Check that the temporary file has the correct contents
+    yaml = YAML()
+    tmp_env = yaml.load(mock_temp_file)
+    assert tmp_env["dependencies"][-1].startswith("python=")
 
 
 # def test_conda_env_and_spec(tmpdir, newconfig, mocksession):
@@ -420,38 +356,3 @@ def test_conda_spec(tox_project, mock_conda_env_runner):
 #     assert venv.path == call.args[4]
 #     assert call.args[5] == "--override-channels"
 #     assert call.args[6].startswith("python=")
-
-
-# def test_verbosity(newconfig, mocksession):
-#     config = newconfig(
-#         [],
-#         """
-#         [testenv:py1]
-#         conda_deps=numpy
-#         [testenv:py2]
-#         conda_deps=numpy
-#     """,
-#     )
-
-#     venv, action, pcalls = create_test_env(config, mocksession, "py1")
-#     tox_testenv_install_deps(action=action, venv=venv)
-#     assert len(pcalls) == 1
-#     call = pcalls[0]
-#     assert "conda" in call.args[0]
-#     assert "install" == call.args[1]
-#     assert isinstance(call.stdout, io.IOBase)
-
-#     tox.reporter.update_default_reporter(
-#         tox.reporter.Verbosity.DEFAULT, tox.reporter.Verbosity.DEBUG
-#     )
-#     venv, action, pcalls = create_test_env(config, mocksession, "py2")
-#     tox_testenv_install_deps(action=action, venv=venv)
-#     assert len(pcalls) == 1
-#     call = pcalls[0]
-#     assert "conda" in call.args[0]
-#     assert "install" == call.args[1]
-#     assert not isinstance(call.stdout, io.IOBase)
-
-
-# def mock_open_to_string(mock):
-#     return "".join(call.args[0] for call in mock().write.call_args_list)
