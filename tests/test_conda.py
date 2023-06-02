@@ -2,6 +2,8 @@ import os
 import shutil
 from fnmatch import fnmatch
 
+import pytest
+
 
 def assert_conda_context(proj, env_name, shell_command, expected_command):
     assert fnmatch(
@@ -56,6 +58,8 @@ def test_missing_conda(tox_project, monkeypatch):
     assert "Failed to find 'conda' executable." in outcome.out
 
 
+# This test must run first to avoid collisions with other tests.
+@pytest.mark.first
 def test_missing_conda_fallback(tox_project, mock_conda_env_runner, monkeypatch):
     ini = """
     [testenv:py123]
@@ -72,6 +76,7 @@ def test_missing_conda_fallback(tox_project, mock_conda_env_runner, monkeypatch)
     monkeypatch.setattr(shutil, "which", which)
     monkeypatch.delenv("_CONDA_EXE", raising=False)
     monkeypatch.delenv("CONDA_EXE", raising=False)
+    monkeypatch.delenv("CONDA_DEFAULT_ENV", raising=False)
 
     outcome = tox_project({"tox.ini": ini}).run("-e", "py123")
 

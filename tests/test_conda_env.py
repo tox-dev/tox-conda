@@ -224,7 +224,7 @@ def test_conda_env(tmp_path, tox_project, mock_conda_env_runner):
     assert fnmatch(
         executed_shell_commands[1],
         (
-            f"*conda env create -p {str(proj.path / '.tox' / 'py123')} "
+            f"*conda env create -p {str(proj.path / '.tox' / 'py123')}"
             f" --file {str(mock_temp_file)} --quiet --force"
         ),
     )

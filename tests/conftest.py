@@ -95,5 +95,7 @@ def mock_conda_env_runner(request, monkeypatch):
             return original_execute_instance_factor(request, options, out, err)
 
     monkeypatch.setattr(CondaEnvRunner, "_execute_instance_factory", mock_execute_instance_factory)
+    monkeypatch.setenv("CONDA_EXE", "conda")
+    monkeypatch.setenv("CONDA_DEFAULT_ENV", "test-env")
 
     yield shell_cmds
