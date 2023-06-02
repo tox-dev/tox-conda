@@ -32,12 +32,12 @@ __all__ = []
 class CondaEnvRunner(PythonRun):
     # Can be overridden in tests
     @staticmethod
-    def _execute_instance_factory(
+    def _default_execute_instance_factory(
         request: ExecuteRequest, options: ExecuteOptions, out: SyncWrite, err: SyncWrite
     ):
         return LocalSubProcessExecuteInstance(request, options, out, err)
 
-    _execute_instance_factory: Union[ExecuteInstance, Callable] = _execute_instance_factory
+    _execute_instance_factory: Callable = _default_execute_instance_factory
 
     def __init__(self, create_args: ToxEnvCreateArgs) -> None:
         self._installer = None
