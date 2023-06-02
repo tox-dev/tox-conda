@@ -1,35 +1,7 @@
-import io
-import os
 import pathlib
-import re
-import subprocess
-from pathlib import Path
-from types import ModuleType, TracebackType
-from typing import Any, Callable, Dict, Optional, Sequence, Union
-from unittest.mock import mock_open, patch
+from unittest.mock import patch
 
-from fnmatch import fnmatch
-import pytest
-import tox
-import tox.run
-from pytest import MonkeyPatch
-from pytest_mock import MockerFixture
 from ruamel.yaml import YAML
-from tox.config.sets import EnvConfigSet
-from tox.execute.api import Execute, ExecuteInstance, ExecuteOptions, ExecuteStatus, Outcome
-from tox.execute.request import ExecuteRequest, shell_cmd
-from tox.execute.stream import SyncWrite
-from tox.plugin import manager
-from tox.pytest import CaptureFixture, ToxProject, ToxProjectCreator
-from tox.report import LOGGER, OutErr
-from tox.run import run as tox_run
-from tox.run import setup_state as previous_setup_state
-from tox.session.cmd.run.parallel import ENV_VAR_KEY
-from tox.session.state import State
-from tox.tox_env import api as tox_env_api
-from tox.tox_env.api import ToxEnv
-
-from tox_conda.plugin import CondaEnvRunner
 
 
 def test_conda_create(tox_project, mock_conda_env_runner):
@@ -54,6 +26,7 @@ def test_conda_create(tox_project, mock_conda_env_runner):
     assert create_env_cmd[4].startswith("python=")
     assert "--yes" == create_env_cmd[5]
     assert "--quiet" == create_env_cmd[6]
+
 
 def test_conda_create_with_name(tox_project, mock_conda_env_runner):
     ini = """
@@ -204,6 +177,7 @@ def test_conda_spec(tox_project, mock_conda_env_runner):
     assert "python=" in cmd_packages
     assert "--file=conda_spec.txt" in cmd_packages
 
+
 def test_conda_env(tmp_path, tox_project, mock_conda_env_runner):
     env_name = "py123"
     ini = f"""
@@ -224,8 +198,9 @@ def test_conda_env(tmp_path, tox_project, mock_conda_env_runner):
         """
     proj = tox_project({"tox.ini": ini})
     (proj.path / "conda-env.yml").write_text(yaml)
-    
+
     mock_temp_file = tmp_path / "mock_temp_file.yml"
+
     def open_mock_temp_file(*args, **kwargs):
         return mock_temp_file.open("w")
 
@@ -235,7 +210,7 @@ def test_conda_env(tmp_path, tox_project, mock_conda_env_runner):
             outcome.assert_success()
 
             mock_unlink.assert_called_once
-   
+
     executed_shell_commands = mock_conda_env_runner
     assert len(executed_shell_commands) == 2
 
@@ -279,7 +254,7 @@ def test_conda_env_and_spec(tox_project, mock_conda_env_runner):
     proj = tox_project({"tox.ini": ini})
     (proj.path / "conda-env.yml").write_text(yaml)
     (proj.path / "conda_spec.txt").touch()
-  
+
     outcome = proj.run("-e", "py123")
     outcome.assert_success()
 
@@ -309,7 +284,7 @@ def test_conda_install_args(tox_project, mock_conda_env_runner):
     """
 
     proj = tox_project({"tox.ini": ini})
-  
+
     outcome = proj.run("-e", "py123")
     outcome.assert_success()
 
@@ -322,6 +297,7 @@ def test_conda_install_args(tox_project, mock_conda_env_runner):
     assert "install" == install_cmd[1]
     assert "--override-channels" in install_cmd
 
+
 def test_conda_create_args(tox_project, mock_conda_env_runner):
     env_name = "py123"
     ini = f"""
@@ -331,7 +307,7 @@ def test_conda_create_args(tox_project, mock_conda_env_runner):
     """
 
     proj = tox_project({"tox.ini": ini})
-  
+
     outcome = proj.run("-e", "py123")
     outcome.assert_success()
 
@@ -343,4 +319,3 @@ def test_conda_create_args(tox_project, mock_conda_env_runner):
     assert "conda" in create_cmd[0]
     assert "create" == create_cmd[1]
     assert "--override-channels" in create_cmd
-
