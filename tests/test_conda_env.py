@@ -25,6 +25,30 @@ def test_conda_create(tox_project, mock_conda_env_runner):
     )
 
 
+def test_conda_create_with_package_install(tox_project, mock_conda_env_runner):
+    ini = """
+    [testenv:py123]
+    """
+    proj = tox_project({"tox.ini": ini})
+
+    outcome = proj.run("-e", "py123")
+    outcome.assert_success()
+
+    executed_shell_commands = mock_conda_env_runner
+    assert len(executed_shell_commands) == 3
+    conda_create_command = executed_shell_commands[1]
+    pip_install_command = executed_shell_commands[2]
+
+    assert fnmatch(
+        conda_create_command,
+        f"*conda create -p {str(proj.path / '.tox' / 'py123')} python=* --yes --quiet*",
+    )
+    assert fnmatch(
+        pip_install_command,
+        f"*conda run -p {str(proj.path / '.tox' / 'py123')} --live-stream python -I -m pip install*",
+    )
+
+
 def test_conda_create_with_name(tox_project, mock_conda_env_runner):
     ini = """
     [testenv:py123]
