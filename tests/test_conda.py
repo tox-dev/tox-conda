@@ -1,18 +1,21 @@
 import os
 import shutil
-import pytest
+from fnmatch import fnmatch
 
+import pytest
 import tox
 from tox.tox_env.errors import Fail
 
 import tox_conda.plugin
 
-from fnmatch import fnmatch
-
 
 def assert_conda_context(proj, env_name, shell_command, expected_command):
-    assert fnmatch(shell_command, f"*conda run -p {str(proj.path / '.tox' / env_name)} --live-stream {expected_command}")
-    
+    assert fnmatch(
+        shell_command,
+        f"*conda run -p {str(proj.path / '.tox' / env_name)} --live-stream {expected_command}",
+    )
+
+
 def test_conda(cmd, initproj):
     # The path has a blank space on purpose for testing issue #119.
     initproj(
@@ -55,7 +58,7 @@ def test_conda_run_command(tox_project, mock_conda_env_runner):
     outcome.assert_success()
 
     executed_shell_commands = mock_conda_env_runner
-    
+
     assert len(executed_shell_commands) == 5
     assert_conda_context(proj, "py123", executed_shell_commands[2], "python --version")
     assert_conda_context(proj, "py123", executed_shell_commands[3], "pytest")

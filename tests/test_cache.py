@@ -2,11 +2,14 @@
 
 from fnmatch import fnmatch
 
+
 def assert_create_command(cmd):
-    assert fnmatch(cmd, "*conda create*") or  fnmatch(cmd, "*conda env create*")
+    assert fnmatch(cmd, "*conda create*") or fnmatch(cmd, "*conda env create*")
+
 
 def assert_install_command(cmd):
-    assert fnmatch(cmd, "*conda install*") 
+    assert fnmatch(cmd, "*conda install*")
+
 
 def test_conda_no_recreate(tox_project, mock_conda_env_runner):
     ini = """
@@ -38,6 +41,7 @@ def test_conda_no_recreate(tox_project, mock_conda_env_runner):
     assert len(executed_shell_commands) == 4
     assert_create_command(executed_shell_commands[1])
     assert_install_command(executed_shell_commands[2])
+
 
 def test_conda_recreate_by_dependency_change(tox_project, mock_conda_env_runner):
     ini = """
@@ -91,7 +95,7 @@ def test_conda_recreate_by_env_file_path_change(tox_project, mock_conda_env_runn
            - pip:
              - pytest
         """
-    
+
     proj_1 = tox_project({"tox.ini": ini})
     (proj_1.path / "conda-env-1.yml").write_text(yaml)
     outcome = proj_1.run("-e", "py123")
@@ -136,7 +140,7 @@ def test_conda_recreate_by_env_file_content_change(tox_project, mock_conda_env_r
            - pip:
              - pytest
         """
-    
+
     proj = tox_project({"tox.ini": ini})
     (proj.path / "conda-env.yml").write_text(yaml)
     outcome = proj.run("-e", "py123")
@@ -176,7 +180,7 @@ def test_conda_recreate_by_spec_file_path_change(tox_project, mock_conda_env_run
            - pip:
              - pytest
         """
-    
+
     proj_1 = tox_project({"tox.ini": ini})
     (proj_1.path / "conda_spec-1.txt").touch()
     outcome = proj_1.run("-e", "py123")
@@ -210,7 +214,7 @@ def test_conda_recreate_by_spec_file_content_change(tox_project, mock_conda_env_
         black
         numpy
     """
-    
+
     proj = tox_project({"tox.ini": ini})
     (proj.path / "conda_spec.txt").write_text(txt)
     outcome = proj.run("-e", "py123")
