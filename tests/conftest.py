@@ -109,7 +109,7 @@ def mock_conda_env_runner(request, monkeypatch):
     def mock_execute_instance_factory(
         request: ExecuteRequest, options: ExecuteOptions, out: SyncWrite, err: SyncWrite
     ):
-        shell_cmds.append(request.cmd)
+        shell_cmds.append(request.shell_cmd)
 
         if request.run_id not in no_mocked_run_ids:
             return MockExecuteInstance(request, options, out, err, 0)

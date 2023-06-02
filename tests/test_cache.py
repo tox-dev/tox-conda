@@ -1,13 +1,12 @@
-import pathlib
-from unittest.mock import patch
+"""Cache tests."""
 
-from ruamel.yaml import YAML
+from fnmatch import fnmatch
 
 def assert_create_command(cmd):
-    assert "conda" in cmd[0] and ("create" == cmd[1] or "create" == cmd[2])
+    assert fnmatch(cmd, "*conda create*") or  fnmatch(cmd, "*conda env create*")
 
 def assert_install_command(cmd):
-    assert "conda" in cmd[0] and "install" == cmd[1]
+    assert fnmatch(cmd, "*conda install*") 
 
 def test_conda_no_recreate(tox_project, mock_conda_env_runner):
     ini = """
