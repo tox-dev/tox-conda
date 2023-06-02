@@ -55,6 +55,30 @@ def test_conda_create(tox_project, mock_conda_env_runner):
     assert "--yes" == create_env_cmd[5]
     assert "--quiet" == create_env_cmd[6]
 
+def test_conda_create_with_name(tox_project, mock_conda_env_runner):
+    ini = """
+    [testenv:py123]
+    skip_install = True
+    conda_name = myenv
+    """
+    proj = tox_project({"tox.ini": ini})
+
+    outcome = proj.run("-e", "py123")
+    outcome.assert_success()
+
+    executed_shell_commands = mock_conda_env_runner
+    assert len(executed_shell_commands) == 2
+
+    create_env_cmd = executed_shell_commands[1]
+
+    assert "conda" in create_env_cmd[0]
+    assert "create" == create_env_cmd[1]
+    assert "-n" == create_env_cmd[2]
+    assert "myenv" == create_env_cmd[3]
+    assert create_env_cmd[4].startswith("python=")
+    assert "--yes" == create_env_cmd[5]
+    assert "--quiet" == create_env_cmd[6]
+
 
 def test_install_deps_no_conda(tox_project, mock_conda_env_runner):
     env_name = "py123"
@@ -274,7 +298,7 @@ def test_conda_env_and_spec(tox_project, mock_conda_env_runner):
     assert "--file=conda_spec.txt" in install_cmd
 
 
-def test_conda_install_args(tmp_path, tox_project, mock_conda_env_runner):
+def test_conda_install_args(tox_project, mock_conda_env_runner):
     env_name = "py123"
     ini = f"""
         [testenv:{env_name}]
@@ -298,7 +322,7 @@ def test_conda_install_args(tmp_path, tox_project, mock_conda_env_runner):
     assert "install" == install_cmd[1]
     assert "--override-channels" in install_cmd
 
-def test_conda_create_args(tmp_path, tox_project, mock_conda_env_runner):
+def test_conda_create_args(tox_project, mock_conda_env_runner):
     env_name = "py123"
     ini = f"""
         [testenv:{env_name}]
@@ -319,3 +343,4 @@ def test_conda_create_args(tmp_path, tox_project, mock_conda_env_runner):
     assert "conda" in create_cmd[0]
     assert "create" == create_cmd[1]
     assert "--override-channels" in create_cmd
+
