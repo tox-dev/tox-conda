@@ -55,6 +55,7 @@ def test_missing_conda(tox_project, monkeypatch):
     outcome.assert_failed()
     assert "Failed to find 'conda' executable." in outcome.out
 
+
 def test_missing_conda_fallback(tox_project, mock_conda_env_runner, monkeypatch):
     ini = """
     [testenv:py123]
@@ -78,6 +79,7 @@ def test_missing_conda_fallback(tox_project, mock_conda_env_runner, monkeypatch)
     executed_shell_commands = mock_conda_env_runner
     # No conda commands should be run because virtualenv is used as a fallback.
     assert len(executed_shell_commands) == 0
+
 
 def test_conda_runner_overload(tox_project, mock_conda_env_runner, monkeypatch):
     ini = """
