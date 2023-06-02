@@ -233,7 +233,7 @@ def test_conda_env(tmp_path, tox_project, mock_conda_env_runner):
     assert tmp_env["dependencies"][-1].startswith("python=")
 
 
-def test_conda_env_and_spec(tmp_path, tox_project, mock_conda_env_runner):
+def test_conda_env_and_spec(tox_project, mock_conda_env_runner):
     env_name = "py123"
     ini = f"""
         [testenv:{env_name}]
@@ -274,50 +274,48 @@ def test_conda_env_and_spec(tmp_path, tox_project, mock_conda_env_runner):
     assert "--file=conda_spec.txt" in install_cmd
 
 
-# def test_conda_install_args(newconfig, mocksession):
-#     config = newconfig(
-#         [],
-#         """
-#         [testenv:py123]
-#         conda_deps=
-#             numpy
-#         conda_install_args=
-#             --override-channels
-#     """,
-#     )
+def test_conda_install_args(tmp_path, tox_project, mock_conda_env_runner):
+    env_name = "py123"
+    ini = f"""
+        [testenv:{env_name}]
+        skip_install = True
+        conda_deps=
+            numpy
+        conda_install_args = --override-channels
+    """
 
-#     venv, action, pcalls = create_test_env(config, mocksession, "py123")
+    proj = tox_project({"tox.ini": ini})
+  
+    outcome = proj.run("-e", "py123")
+    outcome.assert_success()
 
-#     assert len(venv.envconfig.conda_install_args) == 1
+    executed_shell_commands = mock_conda_env_runner
+    assert len(executed_shell_commands) == 3
 
-#     tox_testenv_install_deps(action=action, venv=venv)
+    install_cmd = executed_shell_commands[2]
 
-#     call = pcalls[-1]
-#     assert call.args[6] == "--override-channels"
+    assert "conda" in install_cmd[0]
+    assert "install" == install_cmd[1]
+    assert "--override-channels" in install_cmd
 
+def test_conda_create_args(tmp_path, tox_project, mock_conda_env_runner):
+    env_name = "py123"
+    ini = f"""
+        [testenv:{env_name}]
+        skip_install = True
+        conda_create_args = --override-channels
+    """
 
-# def test_conda_create_args(newconfig, mocksession):
-#     config = newconfig(
-#         [],
-#         """
-#         [testenv:py123]
-#         conda_create_args=
-#             --override-channels
-#     """,
-#     )
+    proj = tox_project({"tox.ini": ini})
+  
+    outcome = proj.run("-e", "py123")
+    outcome.assert_success()
 
-#     venv = VirtualEnv(config.envconfigs["py123"])
-#     assert venv.path == config.envconfigs["py123"].envdir
+    executed_shell_commands = mock_conda_env_runner
+    assert len(executed_shell_commands) == 2
 
-#     with mocksession.newaction(venv.name, "getenv") as action:
-#         tox_testenv_create(action=action, venv=venv)
-#     pcalls = mocksession._pcalls
-#     assert len(pcalls) >= 1
-#     call = pcalls[-1]
-#     assert "conda" in call.args[0]
-#     assert "create" == call.args[1]
-#     assert "--yes" == call.args[2]
-#     assert "-p" == call.args[3]
-#     assert venv.path == call.args[4]
-#     assert call.args[5] == "--override-channels"
-#     assert call.args[6].startswith("python=")
+    create_cmd = executed_shell_commands[1]
+
+    assert "conda" in create_cmd[0]
+    assert "create" == create_cmd[1]
+    assert "--override-channels" in create_cmd
