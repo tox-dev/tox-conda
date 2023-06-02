@@ -147,30 +147,37 @@ def test_install_conda_with_deps(tox_project, mock_conda_env_runner):
     assert "python -I -m pip install" in pip_cmd
 
 
-# def test_update(tmpdir, newconfig, mocksession):
-#     pkg = tmpdir.ensure("package.tar.gz")
-#     config = newconfig(
-#         [],
-#         """
-#         [testenv:py123]
-#         deps=
-#             numpy
-#             astropy
-#         conda_deps=
-#             pytest
-#             asdf
-#     """,
-#     )
+def test_conda_spec(tox_project, mock_conda_env_runner):
+    env_name = "py123"
+    ini = f"""
+        [testenv:{env_name}]
+        skip_install = True
+        conda_deps =
+            numpy
+            astropy
+        conda_spec = conda_spec.txt
+    """
+    proj = tox_project({"tox.ini": ini})
+    (proj.path / "conda_spec.txt").touch()
 
-#     venv, action, pcalls = create_test_env(config, mocksession, "py123")
-#     tox_testenv_install_deps(action=action, venv=venv)
+    outcome = proj.run("-e", "py123")
+    outcome.assert_success()
 
-#     venv.hook.tox_testenv_create = tox_testenv_create
-#     venv.hook.tox_testenv_install_deps = tox_testenv_install_deps
-#     with mocksession.newaction(venv.name, "update") as action:
-#         venv.update(action)
-#         venv.installpkg(pkg, action)
+    executed_shell_commands = mock_conda_env_runner
+    assert len(executed_shell_commands) == 3
 
+    cmd = executed_shell_commands[2]
+    cmd_conda_prefix = " ".join(cmd[:6])
+    cmd_packages = " ".join(cmd[6:])
+
+    assert cmd_conda_prefix.endswith(
+        f"conda install --quiet --yes -p {str(proj.path / '.tox' / env_name)}"
+    )
+
+    assert "astropy" in cmd_packages
+    assert "numpy" in cmd_packages
+    assert "python=" in cmd_packages
+    assert "--file=conda_spec.txt" in cmd_packages
 
 # def test_conda_spec(tmpdir, newconfig, mocksession):
 #     """Test environment creation when conda_spec given"""
