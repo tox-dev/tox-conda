@@ -101,7 +101,7 @@ With the plugin enabled and no other changes, the ``tox-conda`` plugin will use
 ``conda`` to create environments and use ``pip`` to install dependencies that are
 given in the ``tox.ini`` configuration file.
 
-``tox-conda`` adds four additional (and optional) settings to the ``[testenv]``
+``tox-conda`` adds six additional (and optional) settings to the ``[testenv]``
 section of configuration files:
 
 * ``conda_deps``, which is used to configure which dependencies are installed
@@ -140,9 +140,12 @@ section of configuration files:
   For instance, passing ``--override-channels`` will create more reproducible environments
   because the channels defined in the user's ``.condarc`` will not interfer.
 
-* If `mamba <https://mamba.readthedocs.io>`_ is installed in the same environment as tox,
-  you may use it instead of the ``conda`` executable by setting the environment variable
-  ``CONDA_EXE=mamba`` in the shell where ``tox`` is called.
+``tox-conda`` will usually install a python version compatible with your specified ``basepython``
+to the conda environment. To disable this behavior set ``basepython`` to ``none``.
+
+If `mamba <https://mamba.readthedocs.io>`_ is installed in the same environment as tox,
+you may use it instead of the ``conda`` executable by setting the environment variable
+``CONDA_EXE=mamba`` in the shell where ``tox`` is called.
 
 An example configuration file is given below:
 

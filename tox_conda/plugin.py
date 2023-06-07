@@ -31,16 +31,23 @@ def postprocess_path_option(testenv_config, value):
     return value
 
 
-def get_py_version(envconfig, action):
+def get_python_packages(envconfig, action):
+    if envconfig.basepython.lower() == "none":
+        return []
+
     # Try to use basepython
-    match = re.match(r"python(\d)(?:\.(\d+))?(?:\.?(\d))?", envconfig.basepython)
+    match = re.match(r"(python|pypy)(\d)(?:\.(\d+))?(?:\.?(\d))?", envconfig.basepython)
     if match:
         groups = match.groups()
-        version = groups[0]
-        if groups[1]:
-            version += ".{}".format(groups[1])
+        version = groups[1]
         if groups[2]:
             version += ".{}".format(groups[2])
+        if groups[3]:
+            version += ".{}".format(groups[3])
+
+        if groups[0] == "pypy":
+            # PyPy doesn't pull pip as a dependency, so we need to manually specify it
+            return ["pypy{}".format(version), "pip"]
 
     # First fallback
     elif envconfig.python_info.version_info:
@@ -52,7 +59,7 @@ def get_py_version(envconfig, action):
         result = action.popen([envconfig.basepython, "-c", code], report_fail=True, returnout=True)
         version = result.decode("utf-8").strip()
 
-    return "python={}".format(version)
+    return ["python={}".format(version)]
 
 
 @hookimpl
@@ -157,7 +164,7 @@ def tox_testenv_create(venv, action):
 
     # Check for venv.envconfig.sitepackages and venv.config.alwayscopy here
     envdir = venv.envconfig.envdir
-    python = get_py_version(venv.envconfig, action)
+    python_packages = get_python_packages(venv.envconfig, action)
 
     if venv.envconfig.conda_env is not None:
         env_path = Path(venv.envconfig.conda_env)
@@ -166,7 +173,8 @@ def tox_testenv_create(venv, action):
         # in the conda-env.yml file
         yaml = YAML()
         env_file = yaml.load(env_path)
-        env_file["dependencies"].append(python)
+        for package in python_packages:
+            env_file["dependencies"].append(package)
 
         tmp_env = tempfile.NamedTemporaryFile(
             dir=env_path.parent,
@@ -197,11 +205,11 @@ def tox_testenv_create(venv, action):
         # Add end-user conda create args
         args += venv.envconfig.conda_create_args
 
-        args += [python]
+        args += python_packages
 
         _run_conda_process(args, venv, action, basepath)
 
-    venv.envconfig.conda_python = python
+    venv.envconfig.conda_python_packages = python_packages
 
     # let the venv know about the target interpreter just installed in our conda env, otherwise
     # we'll have a mismatch later because tox expects the interpreter to be existing outside of
@@ -239,7 +247,7 @@ def install_conda_deps(venv, action, basepath, envdir):
     # python in this environment. If any of the requirements are in conflict
     # with the installed python version, installation will fail (which is what
     # we want).
-    args += [venv.envconfig.conda_python] + conda_deps
+    args += venv.envconfig.conda_python_packages + conda_deps
 
     _run_conda_process(args, venv, action, basepath)
 

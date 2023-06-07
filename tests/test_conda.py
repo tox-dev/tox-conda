@@ -1,6 +1,8 @@
 import shutil
 
+import pytest
 import tox
+from tox.venv import VirtualEnv
 
 import tox_conda.plugin
 
@@ -151,3 +153,34 @@ def test_issue_115(cmd, initproj):
 
     result = cmd()
     result.assert_success()
+
+
+@pytest.mark.parametrize(
+    "basepython,expected",
+    [
+        ("python3.8", ["python=3.8"]),
+        ("python3.9", ["python=3.9"]),
+        ("python3.10", ["python=3.10"]),
+        ("pypy3.8", ["pypy3.8", "pip"]),
+        ("pypy3.9", ["pypy3.9", "pip"]),
+        ("none", []),
+        ("None", []),
+    ],
+)
+def test_python_packages(newconfig, mocksession, basepython, expected):
+    config = newconfig(
+        [],
+        """
+        [testenv:test]
+        basepython={}
+        """.format(
+            basepython
+        ),
+    )
+    venv = VirtualEnv(config.envconfigs["test"])
+    assert venv.path == config.envconfigs["test"].envdir
+
+    with mocksession.newaction(venv.name, "getenv") as action:
+        result = tox_conda.plugin.get_python_packages(config.envconfigs["test"], action)
+
+    assert set(result) == set(expected)
