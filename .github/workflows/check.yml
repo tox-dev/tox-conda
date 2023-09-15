@@ -68,7 +68,7 @@ jobs:
         run: |
           import os; os.rename('.tox/coverage.{}.xml'.format(os.environ['TOXENV']), '.tox/coverage.xml')
         shell: python
-      - uses: codecov/codecov-action@v3
+      - uses: codecov/codecov-action@v4
         with:
           file: ./.tox/coverage.xml
           flags: tests
