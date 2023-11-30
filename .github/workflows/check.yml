@@ -44,7 +44,7 @@ jobs:
       - name: install tox
         run: python -m pip install tox
       - name: Setup Miniconda
-        uses: conda-incubator/setup-miniconda@v2.2.0
+        uses: conda-incubator/setup-miniconda@v3.0.1
         with:
           miniconda-version: "latest"
           python-version: ${{ matrix.py }}
