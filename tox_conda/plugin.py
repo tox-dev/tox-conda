@@ -11,20 +11,29 @@ from functools import partial
 from io import BytesIO, TextIOWrapper
 from pathlib import Path
 from time import sleep
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 
 from ruamel.yaml import YAML
-from tox.execute.api import Execute, ExecuteInstance, ExecuteOptions, ExecuteRequest, SyncWrite
+from tox.execute.api import (
+    Execute,
+    ExecuteInstance,
+    ExecuteOptions,
+    ExecuteRequest,
+    StdinSource,
+    SyncWrite,
+)
 from tox.execute.local_sub_process import LocalSubProcessExecuteInstance, LocalSubProcessExecutor
 from tox.plugin import impl
-from tox.plugin.spec import EnvConfigSet, State, ToxEnvRegister
-from tox.tox_env.api import StdinSource, ToxEnvCreateArgs
 from tox.tox_env.errors import Fail
 from tox.tox_env.installer import Installer
 from tox.tox_env.python.api import PythonInfo, VersionInfo
 from tox.tox_env.python.pip.pip_install import Pip
 from tox.tox_env.python.pip.req_file import PythonDeps
 from tox.tox_env.python.runner import PythonRun
+
+if TYPE_CHECKING:
+    from tox.plugin.spec import EnvConfigSet, State, ToxEnvRegister
+    from tox.tox_env.api import ToxEnvCreateArgs
 
 __all__ = []
 
@@ -39,7 +48,7 @@ class CondaEnvRunner(PythonRun):
 
     _execute_instance_factory: Callable = _default_execute_instance_factory
 
-    def __init__(self, create_args: ToxEnvCreateArgs) -> None:
+    def __init__(self, create_args: "ToxEnvCreateArgs") -> None:
         self._installer = None
         self._executor = None
         self._external_executor = None
@@ -456,7 +465,7 @@ class CondaEnvRunner(PythonRun):
 
 
 @impl
-def tox_register_tox_env(register: ToxEnvRegister) -> None:  # noqa: U100
+def tox_register_tox_env(register: "ToxEnvRegister") -> None:  # noqa: U100
     register.add_run_env(CondaEnvRunner)
     try:
         # Change the defaukt runner only if conda is available
@@ -468,7 +477,7 @@ def tox_register_tox_env(register: ToxEnvRegister) -> None:  # noqa: U100
 
 
 @impl
-def tox_add_env_config(env_conf: EnvConfigSet, state: State) -> None:
+def tox_add_env_config(env_conf: "EnvConfigSet", state: "State") -> None:
     env_conf.add_config(
         "conda_name",
         of_type=str,
@@ -479,8 +488,9 @@ def tox_add_env_config(env_conf: EnvConfigSet, state: State) -> None:
     env_conf.add_config(
         "conda_python",
         of_type=str,
-        desc="Specifies the name of the Python interpreter (python or pypy) and its version in the conda "
-        'environment. By default, it uses the "python" interpreter and the currently active version.',
+        desc="Specifies the name of the Python interpreter (python or pypy) and its version "
+        "in the conda environment. By default, it uses the 'python' interpreter and the "
+        "currently active version.",
         default=None,
     )
 
