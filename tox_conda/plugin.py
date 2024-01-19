@@ -11,7 +11,7 @@ from functools import partial
 from io import BytesIO, TextIOWrapper
 from pathlib import Path
 from time import sleep
-from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
 from ruamel.yaml import YAML
 from tox.execute.api import (
