@@ -98,19 +98,40 @@ class CondaEnvRunner(PythonRun):
     def _external_pkg_tox_env_type(self) -> str:
         return "virtualenv-cmd-builder"
 
-    def _get_python_env_version(self):
+    def _get_python_packages(self):
         # Try to use base_python config
-        match = re.match(r"python(\d)(?:\.(\d+))?(?:\.?(\d))?", self.conf["base_python"][0])
-        if match:
-            groups = match.groups()
-            version = groups[0]
-            if groups[1]:
-                version += ".{}".format(groups[1])
-            if groups[2]:
-                version += ".{}".format(groups[2])
-            return version
+        conda_python = self.conf["conda_python"]
+        if not conda_python:
+            # If not specified, use the base_python version
+            return [f"python={self.base_python.version_dot}"]
+
+        match = re.match(r"(python|pypy)(\d)(?:\.(\d+))?(?:\.?(\d))?", conda_python)
+        if not match:
+            raise Fail(
+                f"Invalid conda_python value '{conda_python}'. "
+                "Must be in the form of 'pythonX.Y' or 'pypyX.Y'."
+            )
+
+        groups = match.groups()
+        interpreter = groups[0]
+
+        version = ""
+        if groups[1]:
+            version = groups[1]
+        if groups[2]:
+            version += ".{}".format(groups[2])
+        if groups[3]:
+            version += ".{}".format(groups[3])
+
+        if interpreter == "pypy":
+            # PyPy doesn't pull pip as a dependency, so we need to manually specify it
+            packages = [f"pypy{version}", "pip"]
+        elif interpreter == "python":
+            packages = [f"python={version}"]
         else:
-            return self.base_python.version_dot
+            raise Fail(f"Unknown interpreter {interpreter}")
+
+        return packages
 
     @property
     def runs_on_platform(self) -> str:
@@ -165,17 +186,18 @@ class CondaEnvRunner(PythonRun):
 
     def create_python_env(self) -> None:
         conda_exe = find_conda()
-        python_version = self._get_python_env_version()
-        python = f"python={python_version}"
+        python_packages = self._get_python_packages()
+        python_packages = " ".join(python_packages)
+
         conda_cache_conf = self.python_cache()["conda"]
 
         if self.conf["conda_env"]:
             create_command, tear_down = CondaEnvRunner._generate_env_create_command(
-                conda_exe, python, conda_cache_conf
+                conda_exe, python_packages, conda_cache_conf
             )
         else:
             create_command, tear_down = CondaEnvRunner._generate_create_command(
-                conda_exe, python, conda_cache_conf
+                conda_exe, python_packages, conda_cache_conf
             )
         try:
             create_command_args = shlex.split(create_command)
@@ -184,7 +206,7 @@ class CondaEnvRunner(PythonRun):
             tear_down()
 
         install_command = CondaEnvRunner._generate_install_command(
-            conda_exe, python, conda_cache_conf
+            conda_exe, python_packages, conda_cache_conf
         )
         if install_command:
             install_command_args = shlex.split(install_command)
@@ -222,10 +244,12 @@ class CondaEnvRunner(PythonRun):
         return cmd, tear_down
 
     @staticmethod
-    def _generate_create_command(conda_exe: Path, python: str, conda_cache_conf: Dict[str, str]):
+    def _generate_create_command(
+        conda_exe: Path, python_packages: str, conda_cache_conf: Dict[str, str]
+    ):
         cmd = (
             f"'{conda_exe}' create {conda_cache_conf['env_spec']} '{conda_cache_conf['env']}'"
-            f" {python} --yes --quiet"
+            f" {python_packages} --yes --quiet"
         )
         for arg in conda_cache_conf.get("create_args", []):
             cmd += f" '{arg}'"
@@ -236,7 +260,9 @@ class CondaEnvRunner(PythonRun):
         return cmd, tear_down
 
     @staticmethod
-    def _generate_install_command(conda_exe: Path, python: str, conda_cache_conf: Dict[str, str]):
+    def _generate_install_command(
+        conda_exe: Path, python_packages: str, conda_cache_conf: Dict[str, str]
+    ):
         # Check if there is anything to install
         if "deps" not in conda_cache_conf and "spec" not in conda_cache_conf:
             return None
@@ -257,7 +283,7 @@ class CondaEnvRunner(PythonRun):
         # python in this environment. If any of the requirements are in conflict
         # with the installed python version, installation will fail (which is what
         # we want).
-        cmd += f" {python}"
+        cmd += f" {python_packages}"
 
         for dep in conda_cache_conf.get("deps", []):
             cmd += f" {dep}"
@@ -447,6 +473,14 @@ def tox_add_env_config(env_conf: EnvConfigSet, state: State) -> None:
         "conda_name",
         of_type=str,
         desc="Specifies the name of the conda environment. By default, .tox/<name> is used.",
+        default=None,
+    )
+
+    env_conf.add_config(
+        "conda_python",
+        of_type=str,
+        desc="Specifies the name of the Python interpreter (python or pypy) and its version in the conda "
+        'environment. By default, it uses the "python" interpreter and the currently active version.',
         default=None,
     )
 

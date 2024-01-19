@@ -68,6 +68,40 @@ def test_conda_create_with_name(tox_project, mock_conda_env_runner):
     assert fnmatch(executed_shell_commands[1], "*conda create -n myenv python=* --yes --quiet*")
 
 
+def test_conda_create_with_conda_python(tox_project, mock_conda_env_runner):
+    ini = """
+    [testenv:py123]
+    skip_install = True
+    conda_name = myenv
+    conda_python = python3.10
+    """
+    proj = tox_project({"tox.ini": ini})
+
+    outcome = proj.run("-e", "py123")
+    outcome.assert_success()
+
+    executed_shell_commands = mock_conda_env_runner
+    assert len(executed_shell_commands) == 2
+    assert fnmatch(executed_shell_commands[1], "*conda create -n myenv python=3.10 --yes --quiet*")
+
+
+def test_conda_create_with_conda_python_as_pypy(tox_project, mock_conda_env_runner):
+    ini = """
+    [testenv:py123]
+    skip_install = True
+    conda_name = myenv
+    conda_python = pypy3.9
+    """
+    proj = tox_project({"tox.ini": ini})
+
+    outcome = proj.run("-e", "py123")
+    outcome.assert_success()
+
+    executed_shell_commands = mock_conda_env_runner
+    assert len(executed_shell_commands) == 2
+    assert fnmatch(executed_shell_commands[1], "*conda create -n myenv pypy3.9 pip --yes --quiet*")
+
+
 def test_install_deps_no_conda(tox_project, mock_conda_env_runner):
     env_name = "py123"
     ini = f"""
