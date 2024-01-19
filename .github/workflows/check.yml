@@ -59,7 +59,10 @@ jobs:
       - name: setup test suite
         run: tox -vv --notest
       - name: run test suite
-        run: tox --skip-pkg-install
+        run: |
+          . .tox/py310/bin/activate
+          cd tests
+          pytest . --timeout 180 --durations 5
         env:
           PYTEST_ADDOPTS: "-vv --durations=20"
           CI_RUN: "yes"
