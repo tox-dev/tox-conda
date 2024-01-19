@@ -13,7 +13,7 @@ jobs:
   pre_commit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: '3.10'
@@ -48,7 +48,7 @@ jobs:
         with:
           miniconda-version: "latest"
           python-version: ${{ matrix.py }}
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: pick environment to run
         run: |
           import subprocess; import json; import os
@@ -89,7 +89,7 @@ jobs:
         exclude:
           - { os: windows, tox_env: pkg_meta }
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: setup Python '3.10'
         uses: actions/setup-python@v4
         with:
@@ -112,7 +112,7 @@ jobs:
           python-version: '3.10'
       - name: install pep517
         run: python -m pip install build
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: build package
         run: python -m build -s -w . -o dist
       - name: publish to PyPi
