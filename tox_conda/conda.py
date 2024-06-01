@@ -21,10 +21,7 @@ from tox.execute.api import (
     StdinSource,
     SyncWrite,
 )
-from tox.execute.local_sub_process import (
-    LocalSubProcessExecuteInstance,
-    LocalSubProcessExecutor,
-)
+from tox.execute.local_sub_process import LocalSubProcessExecuteInstance, LocalSubProcessExecutor
 from tox.tox_env.errors import Fail
 from tox.tox_env.installer import Installer
 from tox.tox_env.python.api import PythonInfo, VersionInfo
@@ -96,9 +93,7 @@ class CondaEnvRunner(PythonRun):
         )
         extra = {"executable_path": exe_path}
 
-        return PythonInfo(
-            implementation, version_info, version, is_64, platform_name, extra
-        )
+        return PythonInfo(implementation, version_info, version, is_64, platform_name, extra)
 
     @property
     def _package_tox_env_type(self) -> str:
@@ -313,9 +308,7 @@ class CondaEnvRunner(PythonRun):
                 out: SyncWrite,
                 err: SyncWrite,
             ) -> ExecuteInstance:
-                return CondaEnvRunner._execute_instance_factory(
-                    request, options, out, err
-                )
+                return CondaEnvRunner._execute_instance_factory(request, options, out, err)
 
         if self._external_executor is None:
             self._external_executor = CondaExecutor(self.options.is_colored)
@@ -352,9 +345,7 @@ class CondaEnvRunner(PythonRun):
                 )
                 # This creates a LocalSubProcessExecuteInstance in real environment,
                 # and it allows testing with dependency injection.
-                return CondaEnvRunner._execute_instance_factory(
-                    conda_request, options, out, err
-                )
+                return CondaEnvRunner._execute_instance_factory(conda_request, options, out, err)
 
         if self._executor is None:
             self._executor = CondaExecutor(self.options.is_colored)

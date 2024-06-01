@@ -3,6 +3,6 @@ devpi_process
 pytest
 pytest-cov
 pytest-mock
-pytest-ordering
+pytest-order
 pytest-timeout
 tox>=4,<5

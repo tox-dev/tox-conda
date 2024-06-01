@@ -1,8 +1,7 @@
-import os
-import shutil
 from fnmatch import fnmatch
 
 import pytest
+from tox.tox_env.errors import Fail
 
 
 def assert_conda_context(proj, env_name, shell_command, expected_command):
@@ -33,49 +32,26 @@ def test_conda_run_command(tox_project, mock_conda_env_runner):
     assert_conda_context(proj, "py123", executed_shell_commands[4], "black")
 
 
-def test_missing_conda(tox_project, monkeypatch):
+def test_missing_conda(tox_project, mocker):
     """Check that an error is shown when the conda executable is not found."""
     ini = """
     [testenv:py123]
     skip_install = True
     runner = conda
     """
-    # Prevent conda from being found.
-    original_which = shutil.which
-
-    def which(cmd, mode=os.F_OK | os.X_OK, path=None):
-        if cmd.endswith("conda"):
-            return None
-        return original_which(cmd, mode, path)
-
-    monkeypatch.setattr(shutil, "which", which)
-    monkeypatch.delenv("_CONDA_EXE", raising=False)
-    monkeypatch.delenv("CONDA_EXE", raising=False)
-
+    mocker.patch("tox_conda.conda.find_conda", side_effect=Fail("not found"))
     outcome = tox_project({"tox.ini": ini}).run("-e", "py123")
-
     outcome.assert_failed()
-    assert "Failed to find 'conda' executable." in outcome.out
 
 
 # This test must run first to avoid collisions with other tests.
-@pytest.mark.first
-def test_missing_conda_fallback(tox_project, mock_conda_env_runner, monkeypatch):
+@pytest.mark.order(1)
+def test_missing_conda_fallback(tox_project, mock_conda_env_runner, mocker, monkeypatch):
     ini = """
     [testenv:py123]
     skip_install = True
     """
-    # Prevent conda from being found.
-    original_which = shutil.which
-
-    def which(cmd, mode=os.F_OK | os.X_OK, path=None):
-        if cmd.endswith("conda"):
-            return None
-        return original_which(cmd, mode, path)
-
-    monkeypatch.setattr(shutil, "which", which)
-    monkeypatch.delenv("_CONDA_EXE", raising=False)
-    monkeypatch.delenv("CONDA_EXE", raising=False)
+    mocker.patch("tox_conda.conda.find_conda", side_effect=Fail("not found"))
     monkeypatch.delenv("CONDA_DEFAULT_ENV", raising=False)
 
     outcome = tox_project({"tox.ini": ini}).run("-e", "py123")
@@ -86,7 +62,7 @@ def test_missing_conda_fallback(tox_project, mock_conda_env_runner, monkeypatch)
     assert len(executed_shell_commands) == 0
 
 
-def test_conda_runner_overload(tox_project, mock_conda_env_runner, monkeypatch):
+def test_conda_runner_overload(tox_project, mock_conda_env_runner):
     ini = """
     [testenv:py123]
     skip_install = True
