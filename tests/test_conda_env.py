@@ -2,7 +2,6 @@
 
 import pathlib
 from fnmatch import fnmatch
-from unittest.mock import patch
 
 from ruamel.yaml import YAML
 
@@ -220,7 +219,7 @@ def test_conda_spec(tox_project, mock_conda_env_runner):
     assert "--file=conda_spec.txt" in conda_install_command
 
 
-def test_conda_env(tmp_path, tox_project, mock_conda_env_runner):
+def test_conda_env(tmp_path, tox_project, mock_conda_env_runner, mocker):
     env_name = "py123"
     ini = f"""
         [testenv:{env_name}]
@@ -242,16 +241,13 @@ def test_conda_env(tmp_path, tox_project, mock_conda_env_runner):
     (proj.path / "conda-env.yml").write_text(yaml)
 
     mock_temp_file = tmp_path / "mock_temp_file.yml"
+    mocker.patch("tempfile.NamedTemporaryFile", return_value=mock_temp_file.open("w"))
+    mock_unlink = mocker.patch.object(pathlib.Path, "unlink", autospec=True)
 
-    def open_mock_temp_file(*args, **kwargs):
-        return mock_temp_file.open("w")
+    outcome = proj.run("-e", "py123")
+    outcome.assert_success()
 
-    with patch("tox_conda.plugin.tempfile.NamedTemporaryFile", open_mock_temp_file):
-        with patch.object(pathlib.Path, "unlink", autospec=True) as mock_unlink:
-            outcome = proj.run("-e", "py123")
-            outcome.assert_success()
-
-            mock_unlink.assert_called_once
+    mock_unlink.assert_called_once()
 
     executed_shell_commands = mock_conda_env_runner
     assert len(executed_shell_commands) == 2
