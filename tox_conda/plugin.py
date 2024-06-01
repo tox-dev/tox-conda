@@ -9,7 +9,9 @@ from tox.tox_env.python.pip.req_file import PythonDeps
 from .conda import CondaEnvRunner, find_conda
 
 if TYPE_CHECKING:
-    from tox.plugin.spec import EnvConfigSet, State, ToxEnvRegister
+    from tox.config.sets import EnvConfigSet
+    from tox.session.state import State
+    from tox.tox_env.register import ToxEnvRegister
 
 __all__ = []
 
@@ -18,7 +20,7 @@ __all__ = []
 def tox_register_tox_env(register: "ToxEnvRegister") -> None:  # noqa: U100
     register.add_run_env(CondaEnvRunner)
     try:
-        # Change the defaukt runner only if conda is available
+        # Change the default runner only if conda is available
         find_conda()
         if "CONDA_DEFAULT_ENV" in os.environ:
             register.default_env_runner = "conda"
