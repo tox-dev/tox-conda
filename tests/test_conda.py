@@ -1,186 +1,76 @@
-import shutil
+from fnmatch import fnmatch
 
 import pytest
-import tox
-from tox.venv import VirtualEnv
-
-import tox_conda.plugin
+from tox.tox_env.errors import Fail
 
 
-def test_conda(cmd, initproj):
-    # The path has a blank space on purpose for testing issue #119.
-    initproj(
-        "pkg 1",
-        filedefs={
-            "tox.ini": """
-                [tox]
-                skipsdist=True
-                [testenv]
-                commands = python -c 'import sys, os; \
-                    print(os.path.exists(os.path.join(sys.prefix, "conda-meta")))'
-            """
-        },
+def assert_conda_context(proj, env_name, shell_command, expected_command):
+    assert fnmatch(
+        shell_command,
+        f"*conda run -p {str(proj.path / '.tox' / env_name)} --live-stream {expected_command}",
     )
-    result = cmd("-v", "-e", "py")
-    result.assert_success()
-
-    def index_of(m):
-        return next((i for i, l in enumerate(result.outlines) if l.startswith(m)), None)
-
-    assert any(
-        "create --yes -p " in line
-        for line in result.outlines[index_of("py create: ") + 1 : index_of("py installed: ")]
-    ), result.output()
-
-    assert result.outlines[-4] == "True"
 
 
-def test_conda_run_command(cmd, initproj):
-    """Check that all the commands are run from an activated anaconda env.
-
-    This is done by looking at the CONDA_PREFIX environment variable which contains
-    the environment name.
-    This variable is dumped to a file because commands_{pre,post} do not redirect
-    their outputs.
+def test_conda_run_command(tox_project, mock_conda_env_runner):
+    """Check that all the commands are run from an activated anaconda env."""
+    ini = """
+    [testenv:py123]
+    skip_install = True
+    commands_pre = python --version
+    commands = pytest
+    commands_post = black
     """
-    env_name = "foobar"
-    initproj(
-        "pkg-1",
-        filedefs={
-            "tox.ini": """
-                [tox]
-                skipsdist=True
-                [testenv:{}]
-                deps =
-                    pip >0,<999
-                    -r requirements.txt
-                commands_pre = python -c "import os; open('commands_pre', 'w').write(os.environ['CONDA_PREFIX'])"
-                commands = python -c "import os; open('commands', 'w').write(os.environ['CONDA_PREFIX'])"
-                commands_post = python -c "import os; open('commands_post', 'w').write(os.environ['CONDA_PREFIX'])"
-            """.format(  # noqa: E501
-                env_name
-            ),
-            "requirements.txt": "",
-        },
-    )
+    proj = tox_project({"tox.ini": ini})
+    outcome = proj.run("-e", "py123")
+    outcome.assert_success()
 
-    result = cmd("-v", "-e", env_name)
-    result.assert_success()
+    executed_shell_commands = mock_conda_env_runner
 
-    for filename in ("commands_pre", "commands_post", "commands"):
-        assert open(filename).read().endswith(env_name)
-
-    # Run once again when the env creation hooks are not called.
-    result = cmd("-v", "-e", env_name)
-    result.assert_success()
-
-    for filename in ("commands_pre", "commands_post", "commands"):
-        assert open(filename).read().endswith(env_name)
+    assert len(executed_shell_commands) == 5
+    assert_conda_context(proj, "py123", executed_shell_commands[2], "python --version")
+    assert_conda_context(proj, "py123", executed_shell_commands[3], "pytest")
+    assert_conda_context(proj, "py123", executed_shell_commands[4], "black")
 
 
-def test_missing_conda(cmd, initproj, monkeypatch):
+def test_missing_conda(tox_project, mocker):
     """Check that an error is shown when the conda executable is not found."""
-
-    initproj(
-        "pkg-1",
-        filedefs={
-            "tox.ini": """
-                [tox]
-                require = tox-conda
-            """,
-        },
-    )
-
-    # Prevent conda from being found.
-    original_which = shutil.which
-
-    def which(path):  # pragma: no cover
-        if path.endswith("conda"):
-            return None
-        return original_which(path)
-
-    monkeypatch.setattr(shutil, "which", which)
-
-    result = cmd()
-
-    assert result.outlines == ["ERROR: {}".format(tox_conda.plugin.MISSING_CONDA_ERROR)]
-
-
-def test_issue_115(cmd, initproj):
-    """Verify that a conda activation script is sourced.
-
-    https://docs.conda.io/projects/conda-build/en/latest/resources/activate-scripts.html
+    ini = """
+    [testenv:py123]
+    skip_install = True
+    runner = conda
     """
-    if tox.INFO.IS_WIN:
-        build_script_name = "build.bat"
-        build_script = """
-            setlocal EnableDelayedExpansion
-            mkdir %CONDA_PREFIX%\\etc\\conda\\activate.d
-            copy activate.bat %CONDA_PREFIX%\\etc\\conda\\activate.d
-        """
-        activate_script_name = "activate.bat"
-        activate_script = """
-            set DUMMY=0
-        """
-        commands_pre = "build.bat"
-
-    else:
-        build_script_name = "build.sh"
-        build_script = """
-            mkdir -p "${CONDA_PREFIX}/etc/conda/activate.d"
-            cp activate.sh "${CONDA_PREFIX}/etc/conda/activate.d"
-        """
-        activate_script_name = "activate.sh"
-        activate_script = """
-            export DUMMY=0
-        """
-        commands_pre = "/bin/sh build.sh"
-
-    initproj(
-        "115",
-        filedefs={
-            build_script_name: build_script,
-            activate_script_name: activate_script,
-            "tox.ini": """
-                [testenv]
-                commands_pre = {}
-                commands = python -c "import os; assert 'DUMMY' in os.environ"
-            """.format(
-                commands_pre
-            ),
-        },
-    )
-
-    result = cmd()
-    result.assert_success()
+    mocker.patch("tox_conda.conda.find_conda", side_effect=Fail("not found"))
+    outcome = tox_project({"tox.ini": ini}).run("-e", "py123")
+    outcome.assert_failed()
 
 
-@pytest.mark.parametrize(
-    "basepython,expected",
-    [
-        ("python3.8", ["python=3.8"]),
-        ("python3.9", ["python=3.9"]),
-        ("python3.10", ["python=3.10"]),
-        ("pypy3.8", ["pypy3.8", "pip"]),
-        ("pypy3.9", ["pypy3.9", "pip"]),
-        ("none", []),
-        ("None", []),
-    ],
-)
-def test_python_packages(newconfig, mocksession, basepython, expected):
-    config = newconfig(
-        [],
-        """
-        [testenv:test]
-        basepython={}
-        """.format(
-            basepython
-        ),
-    )
-    venv = VirtualEnv(config.envconfigs["test"])
-    assert venv.path == config.envconfigs["test"].envdir
+# This test must run first to avoid collisions with other tests.
+@pytest.mark.order(1)
+def test_missing_conda_fallback(tox_project, mock_conda_env_runner, mocker, monkeypatch):
+    ini = """
+    [testenv:py123]
+    skip_install = True
+    """
+    mocker.patch("tox_conda.conda.find_conda", side_effect=Fail("not found"))
+    monkeypatch.delenv("CONDA_DEFAULT_ENV", raising=False)
 
-    with mocksession.newaction(venv.name, "getenv") as action:
-        result = tox_conda.plugin.get_python_packages(config.envconfigs["test"], action)
+    outcome = tox_project({"tox.ini": ini}).run("-e", "py123")
 
-    assert set(result) == set(expected)
+    outcome.assert_success()
+    executed_shell_commands = mock_conda_env_runner
+    # No conda commands should be run because virtualenv is used as a fallback.
+    assert len(executed_shell_commands) == 0
+
+
+def test_conda_runner_overload(tox_project, mock_conda_env_runner):
+    ini = """
+    [testenv:py123]
+    skip_install = True
+    runner = virtualenv
+    """
+    outcome = tox_project({"tox.ini": ini}).run("-e", "py123")
+
+    outcome.assert_success()
+    executed_shell_commands = mock_conda_env_runner
+    # No conda commands should be run because virtualenv is used.
+    assert len(executed_shell_commands) == 0

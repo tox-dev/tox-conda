@@ -1,0 +1,8 @@
+-e .
+devpi_process
+pytest
+pytest-cov
+pytest-mock
+pytest-order
+pytest-timeout
+tox>=4,<5
